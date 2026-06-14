@@ -54,7 +54,6 @@
         .btn-danger { background:var(--red);color:white; }
         .btn-icon { background:var(--red);padding:10px;border-radius:14px;font-weight:bold;font-size:13px;width:36px;height:40px;display:flex;align-items:center;justify-content:center; }
         .btn-delete { background:rgba(255,82,82,0.2);color:var(--red);border:1px solid var(--red);padding:6px 12px;font-size:10px;border-radius:10px; }
-        .btn-edit { background:rgba(68,138,255,0.2);color:var(--blue);border:1px solid var(--blue);padding:6px 12px;font-size:10px;border-radius:10px;margin-right:4px; }
         .btn-registrar { background:linear-gradient(135deg,#ff9100,#ff6d00);color:white;padding:8px 14px;font-size:11px;border-radius:12px;margin-top:8px;width:100%; }
         .btn-add-treino { background:rgba(0,230,118,0.15);border:1px dashed var(--green);color:var(--green);width:100%;margin-top:10px;padding:10px;font-size:12px; }
 
@@ -163,7 +162,6 @@
             <div class="distancia-row"><div class="label">📏 DISTÂNCIA (KM)</div><input id="distanciaManual" type="number" placeholder="0.00" step="0.1" inputmode="decimal"></div>
             <div class="horario-section"><div class="horario-toggle" onclick="toggleHorario()"><span id="horarioToggleIcon">▶</span> Registrar horário</div><div id="horarioFields" style="display:none;"><div class="time-picker-row"><div><div class="label">🏁 INÍCIO</div><input type="time" id="horaInicio"></div><div><div class="label">🏁 FIM</div><input type="time" id="horaFim"></div></div></div></div>
             <div id="dataRetroativaInfo" style="display:none;" class="data-retroativa-info">📅 Registrando para: <strong id="dataRetroativaTexto"></strong></div>
-            <div id="modoEdicaoInfo" style="display:none;background:rgba(68,138,255,0.15);border:1px solid var(--blue);border-radius:10px;padding:8px;margin-bottom:10px;font-size:12px;color:var(--blue);">✏️ Modo Edição</div>
         </div>
         <button class="btn-primary" onclick="salvarTreinoComFeedback()">✅ Salvar Treino</button>
         <div id="feedback" style="display:none;"></div>
@@ -233,7 +231,16 @@
     </div>
 </div>
 
-<div id="modalOverlay" class="modal-overlay" style="display:none;"><div class="modal-content"><h3 id="modalTitle"></h3><p id="modalMessage"></p><div class="btn-group"><button class="btn-secondary" onclick="fecharModal()">Cancelar</button><button class="btn-danger" id="modalConfirmBtn">Confirmar</button></div></div></div>
+<div id="modalOverlay" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h3 id="modalTitle"></h3>
+        <p id="modalMessage"></p>
+        <div class="btn-group">
+            <button class="btn-secondary" id="modalCancelBtn">Cancelar</button>
+            <button class="btn-danger" id="modalConfirmBtn">Confirmar</button>
+        </div>
+    </div>
+</div>
 
 <div class="bottom-nav">
     <button class="nav-btn active-nav" onclick="trocarComAnimacao('home',this)">🏠<span>Home</span></button>
@@ -251,7 +258,7 @@ let treinoAtual = [], historico = [], metaSemanal = 3;
 let mesAtual = new Date().getMonth(), anoAtual = new Date().getFullYear();
 let mostrandoMeses = false, horarioVisivel = false;
 let graficos = {}, modalCallback = null, treinoParaExcluir = null;
-let dataRetroativa = null, editandoId = null;
+let dataRetroativa = null;
 let perfil = { nome:"", dia:"", mesNasc:"", ano:"", peso:"", altura:"", genero:"homem", avatar:"grad1" };
 let avatarSelecionado = "grad1", primeiroAcesso = false;
 
@@ -680,9 +687,6 @@ function criarParticulas() {
 
 function setDataRetroativa(d) {
     dataRetroativa = d;
-    editandoId = null;
-    let modoEdicao = document.getElementById("modoEdicaoInfo");
-    if (modoEdicao) modoEdicao.style.display = "none";
     let info = document.getElementById("dataRetroativaInfo");
     if (info) {
         document.getElementById("dataRetroativaTexto").textContent = d;
@@ -698,63 +702,14 @@ function setDataRetroativa(d) {
 
 function limparDataRetroativa() {
     dataRetroativa = null;
-    editandoId = null;
     let info = document.getElementById("dataRetroativaInfo");
     if (info) info.style.display = 'none';
-    let modoEdicao = document.getElementById("modoEdicaoInfo");
-    if (modoEdicao) modoEdicao.style.display = 'none';
     let btn = document.querySelector('.btn-primary');
     if (btn) {
         btn.textContent = '✅ Salvar Treino';
         btn.style.background = 'linear-gradient(135deg,#00e676 0%,#00c853 100%)';
         btn.style.color = '#000';
     }
-}
-
-// NOVA FUNÇÃO AUXILIAR PARA EDITAR POR ID
-function editarTreinoPorId(id) {
-    let treino = historico.find(t => t.id === id);
-    if (treino) {
-        entrarModoEdicao(treino);
-    } else {
-        mostrarFeedbackTemporario("⚠️ Treino não encontrado para edição.", "vermelho");
-    }
-}
-
-function entrarModoEdicao(treino) {
-    if (!treino) { mostrarFeedbackTemporario("⚠️ Erro ao carregar treino para edição.", "vermelho"); return; }
-    editandoId = treino.id;
-    dataRetroativa = null;
-    let info = document.getElementById("dataRetroativaInfo");
-    if (info) info.style.display = 'none';
-    let modoEdicao = document.getElementById("modoEdicaoInfo");
-    if (modoEdicao) modoEdicao.style.display = 'block';
-    let btn = document.querySelector('.btn-primary');
-    if (btn) {
-        btn.textContent = '✏️ Atualizar Treino';
-        btn.style.background = 'linear-gradient(135deg,#448aff,#0059c1)';
-        btn.style.color = '#fff';
-    }
-    treinoAtual = JSON.parse(JSON.stringify(treino.blocos));
-    document.getElementById("distanciaManual").value = treino.dist || '';
-    if (treino.horaInicio) document.getElementById("horaInicio").value = treino.horaInicio;
-    if (treino.horaFim) document.getElementById("horaFim").value = treino.horaFim;
-    if (!horarioVisivel && (treino.horaInicio || treino.horaFim)) toggleHorario();
-    renderBlocos();
-    atualizarContadorTreinos();
-    atualizarTempoTotal();
-
-    // Navega para Home SEM disparar limpeza do editandoId
-    ['home','cal','prog','ajustes'].forEach(p => { 
-        let div = document.getElementById(p); 
-        if (div) div.style.display = 'none'; 
-    });
-    let homeDiv = document.getElementById('home');
-    if (homeDiv) homeDiv.style.display = 'block';
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
-    let homeBtn = document.querySelector(".nav-btn[onclick*='home']");
-    if (homeBtn) homeBtn.classList.add("active-nav");
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function toggleHorario() {
@@ -855,19 +810,45 @@ function formatarTempo(el, i) {
     atualizarTempoTotal();
 }
 
-// ============== MODAL GENÉRICO ==============
+// ============== MODAL GENÉRICO (CORRIGIDO) ==============
 function abrirModal(t, m, c, ct) {
     document.getElementById("modalTitle").textContent = t;
     document.getElementById("modalMessage").textContent = m;
-    document.getElementById("modalConfirmBtn").textContent = ct || "Confirmar";
+    let btnConfirmar = document.getElementById("modalConfirmBtn");
+    btnConfirmar.textContent = ct || "Confirmar";
     document.getElementById("modalOverlay").style.display = "flex";
+    
+    btnConfirmar.replaceWith(btnConfirmar.cloneNode(true));
+    btnConfirmar = document.getElementById("modalConfirmBtn");
+    
+    btnConfirmar.onclick = function() {
+        if (typeof c === 'function') {
+            try { c(); } catch(e) { console.error("Erro na callback do modal:", e); }
+        }
+        fecharModal();
+    };
+    
+    let btnCancelar = document.getElementById("modalCancelBtn");
+    if (btnCancelar) {
+        btnCancelar.replaceWith(btnCancelar.cloneNode(true));
+        document.getElementById("modalCancelBtn").onclick = function() {
+            fecharModal();
+        };
+    }
+    
     modalCallback = c;
 }
-function fecharModal() { document.getElementById("modalOverlay").style.display = "none"; modalCallback = null; }
-document.getElementById("modalConfirmBtn").onclick = function() { if (modalCallback) modalCallback(); fecharModal(); };
-document.getElementById("modalOverlay").addEventListener("click", function(e) { if (e.target === this) fecharModal(); });
 
-// ============== SALVAR / EDITAR ==============
+function fecharModal() {
+    document.getElementById("modalOverlay").style.display = "none";
+    modalCallback = null;
+}
+
+document.getElementById("modalOverlay").addEventListener("click", function(e) {
+    if (e.target === this) fecharModal();
+});
+
+// ============== SALVAR ==============
 function salvarTreinoComFeedback() {
     if (treinoAtual.length === 0) { mostrarFeedbackTemporario("⚠️ Adicione pelo menos um treino!", "vermelho"); return; }
     let dist = Number(document.getElementById("distanciaManual").value) || 0;
@@ -888,10 +869,10 @@ function salvarTreinoComFeedback() {
     if (h1 && h2) horarioTexto = `<div class="horario-salvo">🕐 ${h1} → ${h2}</div>`;
     else if (h1) horarioTexto = `<div class="horario-salvo">🕐 Início: ${h1}</div>`;
 
-    let feedbackSalvo = gerarFeedbackInteligente({ blocos: treinoAtual, dist, pontos, id: editandoId || Date.now(), calorias });
+    let feedbackSalvo = gerarFeedbackInteligente({ blocos: treinoAtual, dist, pontos, id: Date.now(), calorias });
 
     let treinoObj = {
-        id: editandoId || Date.now(),
+        id: Date.now(),
         data: dataTreinoChave,
         dist, blocos: JSON.parse(JSON.stringify(treinoAtual)),
         pontos, classe: analise.classe, tipo: analise.texto, emoji: analise.emoji,
@@ -904,16 +885,7 @@ function salvarTreinoComFeedback() {
         calorias: calorias
     };
 
-    if (editandoId) {
-        let idx = historico.findIndex(t => t.id === editandoId);
-        if (idx !== -1) {
-            treinoObj.id = editandoId;
-            treinoObj.data = historico[idx].data;
-            historico[idx] = treinoObj;
-        }
-    } else {
-        historico.push(treinoObj);
-    }
+    historico.push(treinoObj);
 
     localStorage.setItem("historico", JSON.stringify(historico));
     atualizarIndice();
@@ -923,7 +895,6 @@ function salvarTreinoComFeedback() {
     let msg = `<div class="pontos-surpresa"><div class="pontos-valor">${pontos}</div><div class="pontos-label">PONTOS</div>
         <div style="font-size:18px;">${analise.emoji} ${analise.texto}</div><div>⭐ ${nota}/10</div>
         <div class="tempo-salvo">⏱️ ${dur.texto}</div>${horarioTexto}${dataRetroativa ? '<div style="color:var(--orange);">📅 Retroativo</div>' : ''}
-        ${editandoId ? '<div style="color:var(--blue);">✏️ Treino atualizado</div>' : ''}
         ${caloriasMsg}
         <div>${comp}</div>${recordeBatido ? '<div>🏆 RECORDE DO MÊS!</div>' : ''}</div>`;
     mostrarFeedbackTemporario(msg, analise.classe);
@@ -944,7 +915,6 @@ function salvarTreinoComFeedback() {
     document.getElementById("horaFim").value = "";
     if (horarioVisivel) toggleHorario();
     limparDataRetroativa();
-    editandoId = null;
 
     renderSemana();
     renderCalendario();
@@ -977,16 +947,22 @@ function obterComparacao(n) {
 
 // ============== EXCLUIR ==============
 function excluirTreino(id, ds) {
+    fecharModal();
     treinoParaExcluir = { id, dataStr: ds };
-    abrirModal("🗑️ Excluir", "Tem certeza que deseja excluir este treino?", function() {
-        historico = historico.filter(t => t.id !== treinoParaExcluir.id);
-        localStorage.setItem("historico", JSON.stringify(historico));
-        atualizarIndice();
-        renderCalendario();
-        renderSemana();
-        abrirDia(treinoParaExcluir.dataStr);
-        atualizarLembrete();
-    }, "Excluir");
+    abrirModal(
+        "🗑️ Excluir", 
+        "Tem certeza que deseja excluir este treino?", 
+        function() {
+            historico = historico.filter(t => t.id !== treinoParaExcluir.id);
+            localStorage.setItem("historico", JSON.stringify(historico));
+            atualizarIndice();
+            renderCalendario();
+            renderSemana();
+            abrirDia(treinoParaExcluir.dataStr);
+            atualizarLembrete();
+        }, 
+        "Excluir"
+    );
 }
 
 function resetarComConfirmacao() {
@@ -1156,7 +1132,6 @@ function abrirDiaComAnimacao(chave) {
             <div>📅 ${t.data} | 📏 ${t.dist} km | 🎯 ${t.pontos} pts | ⏱️ ${t.duracao||''}</div>${horarioInfo}<hr>`;
         for (let b of t.blocos) html += `🔹 Treino: ${b.vel||0} km/h | ${b.inc||0}% | ${b.tempo||'0:00'}<br>`;
         html += `<div style="text-align:right;margin-top:10px;">
-            <button class="btn-edit" onclick="event.stopPropagation(); editarTreinoPorId(${t.id})">✏️ Editar</button>
             <button class="btn-delete" onclick="event.stopPropagation(); excluirTreino(${t.id},'${t.data}')">🗑️ Excluir</button></div>`;
         if (t.feedback) html += `<div style="margin-top:10px;">${t.feedback}</div>`;
         html += '</div>';
@@ -1187,7 +1162,6 @@ function trocarComAnimacao(pag, el) {
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
     if (el) el.classList.add("active-nav");
     
-    // SEMPRE ocultar feedbacks ao trocar de página
     ocultarFeedbacks();
     
     if (pag === "home") {
@@ -1330,7 +1304,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "15.2" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "16.0" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1548,8 +1522,6 @@ window.resetarComConfirmacao = resetarComConfirmacao;
 window.excluirTreino = excluirTreino;
 window.abrirDiaComAnimacao = abrirDiaComAnimacao;
 window.registrarTreinoEsquecido = registrarTreinoEsquecido;
-window.entrarModoEdicao = entrarModoEdicao;
-window.editarTreinoPorId = editarTreinoPorId;
 window.limparDataRetroativa = limparDataRetroativa;
 window.setDataRetroativa = setDataRetroativa;
 window.atualizarTempoTotal = atualizarTempoTotal;

@@ -53,6 +53,7 @@
         .btn-danger { background:var(--red);color:white; }
         .btn-icon { background:var(--red);padding:10px;border-radius:14px;font-weight:bold;font-size:13px;width:36px;height:40px;display:flex;align-items:center;justify-content:center; }
         .btn-delete { background:rgba(255,82,82,0.2);color:var(--red);border:1px solid var(--red);padding:6px 12px;font-size:10px;border-radius:10px; }
+        .btn-edit { background:rgba(68,138,255,0.2);color:var(--blue);border:1px solid var(--blue);padding:6px 12px;font-size:10px;border-radius:10px;margin-right:4px; }
         .btn-registrar { background:linear-gradient(135deg,#ff9100,#ff6d00);color:white;padding:8px 14px;font-size:11px;border-radius:12px;margin-top:8px;width:100%; }
         .btn-add-treino { background:rgba(0,230,118,0.15);border:1px dashed var(--green);color:var(--green);width:100%;margin-top:10px;padding:10px;font-size:12px; }
 
@@ -129,6 +130,10 @@
         .avatar-options { display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:12px 0; }
         .avatar-option { width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;border:3px solid transparent;transition:0.2s; }
         .avatar-option:hover,.avatar-option.selecionado { border-color:var(--green); }
+        .imc-info { font-size:13px; margin-top:10px; padding:8px; background:var(--bg-elevated); border-radius:12px; }
+        .conquistas-resumidas { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; margin-top:10px; }
+        .conquista-resumida { display:flex; flex-direction:column; align-items:center; font-size:12px; }
+        .conquista-resumida .icone { font-size:24px; }
     </style>
 </head>
 <body>
@@ -156,6 +161,7 @@
             <div class="distancia-row"><div class="label">📏 DISTÂNCIA (KM)</div><input id="distanciaManual" type="number" placeholder="0.00" step="0.1" inputmode="decimal"></div>
             <div class="horario-section"><div class="horario-toggle" onclick="toggleHorario()"><span id="horarioToggleIcon">▶</span> Registrar horário</div><div id="horarioFields" style="display:none;"><div class="time-picker-row"><div><div class="label">🏁 INÍCIO</div><input type="time" id="horaInicio"></div><div><div class="label">🏁 FIM</div><input type="time" id="horaFim"></div></div></div></div>
             <div id="dataRetroativaInfo" style="display:none;" class="data-retroativa-info">📅 Registrando para: <strong id="dataRetroativaTexto"></strong></div>
+            <div id="modoEdicaoInfo" style="display:none;background:rgba(68,138,255,0.15);border:1px solid var(--blue);border-radius:10px;padding:8px;margin-bottom:10px;font-size:12px;color:var(--blue);">✏️ Modo Edição</div>
         </div>
         <button class="btn-primary" onclick="salvarTreinoComFeedback()">✅ Salvar Treino</button>
         <div id="feedback" style="display:none;"></div>
@@ -169,7 +175,15 @@
         </div>
         <div class="month-header"><span class="month-nav" onclick="mudarMes(-1)">◀</span><h2 class="month-title" onclick="toggleMeses()" id="tituloMes"></h2><span class="month-nav" onclick="mudarMes(1)">▶</span></div>
         <div class="card"><div id="semanaCal" class="week"></div></div>
-        <div class="card"><div class="month-header-cal"><div class="header-cell">DOM</div><div class="header-cell">SEG</div><div class="header-cell">TER</div><div class="header-cell">QUA</div><div class="header-cell">QUI</div><div class="header-cell">SEX</div><div class="header-cell">SÁB</div><div class="header-cell"></div></div><div id="mesGrid" class="month"></div><div id="conquistasDoMes" style="margin-top:10px;text-align:center;"></div></div>
+        <div class="card">
+            <div class="month-header-cal">
+                <div class="header-cell">DOM</div><div class="header-cell">SEG</div><div class="header-cell">TER</div>
+                <div class="header-cell">QUA</div><div class="header-cell">QUI</div><div class="header-cell">SEX</div>
+                <div class="header-cell">SÁB</div><div class="header-cell"></div>
+            </div>
+            <div id="mesGrid" class="month"></div>
+            <div id="conquistasDoMes" style="margin-top:10px;text-align:center;"></div>
+        </div>
         <div id="detalheDia"></div>
     </div>
 
@@ -209,6 +223,8 @@
             <div class="label">DATA DE NASCIMENTO</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;"><input type="number" id="inputDia" placeholder="Dia" min="1" max="31"><input type="number" id="inputMesNasc" placeholder="Mês" min="1" max="12"><input type="number" id="inputAno" placeholder="Ano" min="1920" max="2020"></div>
             <div class="label">PESO (kg)</div><input type="number" id="inputPeso" placeholder="Peso" step="0.1" min="20" max="300">
+            <div class="label">ALTURA (cm)</div><input type="number" id="inputAltura" placeholder="Ex: 175" step="0.1" min="100" max="250">
+            <div id="imcDisplay" class="imc-info" style="display:none;"></div>
             <div class="label">GÊNERO</div><select id="inputGenero"><option value="homem">👨 Homem</option><option value="mulher">👩 Mulher</option><option value="outro">🌈 Outro</option></select>
         </div>
         <div class="btn-group"><button class="btn-secondary" onclick="pularPerfil()">Pular</button><button class="btn-primary" style="color:#000;" onclick="salvarPerfil()">💾 Salvar</button></div>
@@ -225,277 +241,1113 @@
 </div>
 
 <script>
-var treinoAtual=[],historico=[],metaSemanal=3,mesAtual=new Date().getMonth(),anoAtual=new Date().getFullYear();
-var mostrandoMeses=false,horarioVisivel=false,graficos={},modalCallback=null,treinoParaExcluir=null,dataRetroativa=null;
-var perfil={nome:"",dia:"",mesNasc:"",ano:"",peso:"",genero:"homem",avatar:"grad1"};
-var avatarSelecionado="grad1";
-var primeiroAcesso=false;
+(function() {
+'use strict';
 
-try{historico=JSON.parse(localStorage.getItem("historico"))||[];metaSemanal=JSON.parse(localStorage.getItem("metaSemanal"))||3;perfil=JSON.parse(localStorage.getItem("perfil"))||perfil;avatarSelecionado=perfil.avatar||"grad1";if(!perfil.nome)primeiroAcesso=true;}catch(e){primeiroAcesso=true;}
+// ============== ESTADO GLOBAL ==============
+let treinoAtual = [], historico = [], metaSemanal = 3;
+let mesAtual = new Date().getMonth(), anoAtual = new Date().getFullYear();
+let mostrandoMeses = false, horarioVisivel = false;
+let graficos = {}, modalCallback = null, treinoParaExcluir = null;
+let dataRetroativa = null, editandoId = null;
+let perfil = { nome:"", dia:"", mesNasc:"", ano:"", peso:"", altura:"", genero:"homem", avatar:"grad1" };
+let avatarSelecionado = "grad1", primeiroAcesso = false;
 
-function getIdade(){if(!perfil.ano||!perfil.mesNasc||!perfil.dia)return null;var hoje=new Date();var nasc=new Date(Number(perfil.ano),Number(perfil.mesNasc)-1,Number(perfil.dia));var idade=hoje.getFullYear()-nasc.getFullYear();var m=hoje.getMonth()-nasc.getMonth();if(m<0||(m===0&&hoje.getDate()<nasc.getDate()))idade--;return idade;}
-function getCorAvatar(){var c={grad1:"linear-gradient(135deg,#00e676,#448aff)",grad2:"linear-gradient(135deg,#ffd740,#ff9100)",grad3:"linear-gradient(135deg,#ff4081,#7c4dff)",grad4:"linear-gradient(135deg,#00e5ff,#0091ea)",grad5:"linear-gradient(135deg,#b388ff,#651fff)"};return c[perfil.avatar]||c.grad1;}
-function getEmojiAvatar(){var e={grad1:"🏃",grad2:"💪",grad3:"🔥",grad4:"⚡",grad5:"🌟"};return e[perfil.avatar]||"🏃";}
+let indiceDia = {};
 
-function atualizarPerfilUI(){
-    var nome=perfil.nome||"Atleta";
-    document.getElementById("saudacaoNome").innerHTML='Olá, <strong>'+nome+'</strong>';
-    var el=document.getElementById("saudacaoNomeCal");if(el)el.innerHTML='Olá, <strong>'+nome+'</strong>';
-    var avatars=document.querySelectorAll(".avatar-small");for(var i=0;i<avatars.length;i++){avatars[i].style.background=getCorAvatar();avatars[i].textContent=getEmojiAvatar();}
+// ============== UTILITÁRIOS ==============
+function chaveData(d) {
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    let date = d ? new Date(d) : new Date();
+    return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
 }
 
-function abrirModalPerfil(){
-    document.getElementById("inputNome").value=perfil.nome||"";
-    document.getElementById("inputDia").value=perfil.dia||"";
-    document.getElementById("inputMesNasc").value=perfil.mesNasc||"";
-    document.getElementById("inputAno").value=perfil.ano||"";
-    document.getElementById("inputPeso").value=perfil.peso||"";
-    document.getElementById("inputGenero").value=perfil.genero||"homem";
-    avatarSelecionado=perfil.avatar||"grad1";
-    document.getElementById("avatarPreview").style.background=getCorAvatar();
-    document.getElementById("avatarPreview").textContent=getEmojiAvatar();
-    document.getElementById("modalPerfil").style.display="flex";
+function hojeChave() { return chaveData(new Date()); }
+
+function atualizarIndice() {
+    indiceDia = {};
+    for (let t of historico) {
+        let chave = t.data;
+        if (!indiceDia[chave]) indiceDia[chave] = [];
+        indiceDia[chave].push(t);
+    }
 }
 
-function selecionarAvatar(el,tipo){
-    avatarSelecionado=tipo;
-    var style=getComputedStyle(el);
-    document.getElementById("avatarPreview").style.background=style.background;
-    document.getElementById("avatarPreview").textContent=el.textContent;
+function getKmDoMes(mes, ano) {
+    let km = 0;
+    for (let chave in indiceDia) {
+        let [y, m] = chave.split('-').map(Number);
+        if (y === ano && (m - 1) === mes) {
+            for (let t of indiceDia[chave]) km += Number(t.dist) || 0;
+        }
+    }
+    return km;
 }
 
-function fecharModalPerfil(){document.getElementById("modalPerfil").style.display="none";}
-
-function pularPerfil(){
-    if(!perfil.nome){perfil.nome="Atleta";perfil.avatar="grad1";localStorage.setItem("perfil",JSON.stringify(perfil));}
-    fecharModalPerfil();atualizarPerfilUI();primeiroAcesso=false;
+function getIdade() {
+    if (!perfil.ano || !perfil.mesNasc || !perfil.dia) return null;
+    let hoje = new Date();
+    let nasc = new Date(Number(perfil.ano), Number(perfil.mesNasc)-1, Number(perfil.dia));
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    let m = hoje.getMonth() - nasc.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+    return idade;
 }
 
-function salvarPerfil(){
-    perfil.nome=document.getElementById("inputNome").value||"Atleta";
-    perfil.dia=document.getElementById("inputDia").value||"";
-    perfil.mesNasc=document.getElementById("inputMesNasc").value||"";
-    perfil.ano=document.getElementById("inputAno").value||"";
-    perfil.peso=document.getElementById("inputPeso").value||"";
-    perfil.genero=document.getElementById("inputGenero").value||"homem";
-    perfil.avatar=avatarSelecionado;
-    localStorage.setItem("perfil",JSON.stringify(perfil));
-    atualizarPerfilUI();fecharModalPerfil();primeiroAcesso=false;
-    mostrarFeedbackTemporario("✅ Perfil atualizado!","verde");
+function getIMC() {
+    let peso = Number(perfil.peso) || 0;
+    let altura = Number(perfil.altura) || 0;
+    if (peso > 0 && altura > 0) {
+        let alt = altura / 100;
+        return peso / (alt * alt);
+    }
+    return null;
 }
 
-// PONTUAÇÃO
-function calcularPontos(blocos,dist){
-    var p=0,tt=0;
-    for(var i=0;i<blocos.length;i++){var b=blocos[i],v=Number(b.vel)||0,inc=Number(b.inc)||0;var sp=String(b.tempo||"00:00").split(":"),m=(Number(sp[0])||0)*60+(Number(sp[1])||0);tt+=m;p+=(v*1.2+inc*2.0)*(m/60);}
-    var dk=Number(dist)||0;p+=dk*8;if(tt>30)p*=1.08;if(tt>60)p*=1.12;if(tt>90)p*=1.18;if(tt>120)p*=1.25;
-    return Math.round(p*10)/10;
+function classificarIMC(imc) {
+    if (imc < 18.5) return 'Abaixo do peso';
+    if (imc < 25) return 'Peso normal';
+    if (imc < 30) return 'Sobrepeso';
+    if (imc < 35) return 'Obesidade grau I';
+    if (imc < 40) return 'Obesidade grau II';
+    return 'Obesidade grau III';
 }
 
-function analisarTreino(p){
-    if(p>=200)return{texto:"🌟 DIVINO",classe:"divino",emoji:"🌟",nivel:"divino"};
-    if(p>=150)return{texto:"💎 MÍTICO",classe:"mitico",emoji:"💎",nivel:"mitico"};
-    if(p>=100)return{texto:"👑 LENDÁRIO",classe:"lendario",emoji:"👑",nivel:"lendario"};
-    if(p>=70)return{texto:"🔥 ÉPICO",classe:"roxo",emoji:"🔥",nivel:"epico"};
-    if(p>=50)return{texto:"💪 EXTREMO",classe:"vermelho",emoji:"💪",nivel:"extremo"};
-    if(p>=35)return{texto:"⚡ INTENSO",classe:"amarelo",emoji:"⚡",nivel:"intenso"};
-    if(p>=22)return{texto:"✅ MODERADO",classe:"verde",emoji:"✅",nivel:"moderado"};
-    if(p>=12)return{texto:"🏃 LEVE",classe:"azul",emoji:"🏃",nivel:"leve"};
-    return{texto:"🌱 INICIANTE",classe:"azul",emoji:"🌱",nivel:"iniciante"};
+function getCorAvatar() {
+    const c = { grad1:"linear-gradient(135deg,#00e676,#448aff)", grad2:"linear-gradient(135deg,#ffd740,#ff9100)", grad3:"linear-gradient(135deg,#ff4081,#7c4dff)", grad4:"linear-gradient(135deg,#00e5ff,#0091ea)", grad5:"linear-gradient(135deg,#b388ff,#651fff)" };
+    return c[perfil.avatar] || c.grad1;
 }
 
-function notaTreino(p){if(p>=200)return 10;if(p>=150)return(9+(p-150)/50).toFixed(1);if(p>=100)return(8+(p-100)/50).toFixed(1);if(p>=70)return(7+(p-70)/30).toFixed(1);if(p>=50)return(6+(p-50)/20).toFixed(1);return Math.min(10,Math.round((p/6)*10)/10).toFixed(1);}
+function getEmojiAvatar() {
+    const e = { grad1:"🏃", grad2:"💪", grad3:"🔥", grad4:"⚡", grad5:"🌟" };
+    return e[perfil.avatar] || "🏃";
+}
 
-function getDuracaoTotal(blocos){var t=0;for(var i=0;i<blocos.length;i++){var sp=String(blocos[i].tempo||"00:00").split(":");t+=(Number(sp[0])||0)*60+(Number(sp[1])||0);}var h=Math.floor(t/60),m=Math.round(t%60);return{horas:h,minutos:m,texto:h>0?h+"h "+m+"min":m+"min"};}
+function atualizarPerfilUI() {
+    let nome = perfil.nome || "Atleta";
+    document.getElementById("saudacaoNome").innerHTML = 'Olá, <strong>'+nome+'</strong>';
+    let elCal = document.getElementById("saudacaoNomeCal");
+    if (elCal) elCal.innerHTML = 'Olá, <strong>'+nome+'</strong>';
+    document.querySelectorAll(".avatar-small").forEach(av => {
+        av.style.background = getCorAvatar();
+        av.textContent = getEmojiAvatar();
+    });
+}
 
-// MÁXIMO DE VELOCIDADE QUE A PESSOA JÁ FEZ
-function getVelocidadeMaximaPessoal(){
-    var max=0;
-    for(var i=0;i<historico.length;i++){
-        for(var j=0;j<historico[i].blocos.length;j++){
-            var v=Number(historico[i].blocos[j].vel)||0;
-            if(v>max)max=v;
+// ============== MODAL PERFIL ==============
+function abrirModalPerfil() {
+    document.getElementById("inputNome").value = perfil.nome || "";
+    document.getElementById("inputDia").value = perfil.dia || "";
+    document.getElementById("inputMesNasc").value = perfil.mesNasc || "";
+    document.getElementById("inputAno").value = perfil.ano || "";
+    document.getElementById("inputPeso").value = perfil.peso || "";
+    document.getElementById("inputAltura").value = perfil.altura || "";
+    document.getElementById("inputGenero").value = perfil.genero || "homem";
+    avatarSelecionado = perfil.avatar || "grad1";
+    document.getElementById("avatarPreview").style.background = getCorAvatar();
+    document.getElementById("avatarPreview").textContent = getEmojiAvatar();
+    document.querySelectorAll(".avatar-option").forEach(opt => {
+        let bg = getComputedStyle(opt).background;
+        if (bg === getCorAvatar()) opt.classList.add("selecionado");
+        else opt.classList.remove("selecionado");
+    });
+    atualizarIMCDisplay();
+    document.getElementById("modalPerfil").style.display = "flex";
+}
+
+function selecionarAvatar(el, tipo) {
+    avatarSelecionado = tipo;
+    document.getElementById("avatarPreview").style.background = getComputedStyle(el).background;
+    document.getElementById("avatarPreview").textContent = el.textContent;
+    document.querySelectorAll(".avatar-option").forEach(opt => opt.classList.remove("selecionado"));
+    el.classList.add("selecionado");
+}
+
+function fecharModalPerfil() { document.getElementById("modalPerfil").style.display = "none"; }
+
+function pularPerfil() {
+    if (!perfil.nome) { perfil.nome = "Atleta"; perfil.avatar = "grad1"; salvarPerfilStorage(); }
+    fecharModalPerfil();
+    atualizarPerfilUI();
+    primeiroAcesso = false;
+}
+
+function atualizarIMCDisplay() {
+    let peso = Number(document.getElementById("inputPeso").value) || 0;
+    let altura = Number(document.getElementById("inputAltura").value) || 0;
+    let imcDiv = document.getElementById("imcDisplay");
+    if (peso > 0 && altura > 0) {
+        let alt = altura / 100;
+        let imc = peso / (alt * alt);
+        let classificacao = classificarIMC(imc);
+        imcDiv.innerHTML = `IMC: ${imc.toFixed(1)} (${classificacao})`;
+        imcDiv.style.display = 'block';
+    } else {
+        imcDiv.style.display = 'none';
+    }
+}
+
+document.getElementById("inputPeso").addEventListener('input', atualizarIMCDisplay);
+document.getElementById("inputAltura").addEventListener('input', atualizarIMCDisplay);
+
+function salvarPerfil() {
+    perfil.nome = document.getElementById("inputNome").value || "Atleta";
+    perfil.dia = document.getElementById("inputDia").value || "";
+    perfil.mesNasc = document.getElementById("inputMesNasc").value || "";
+    perfil.ano = document.getElementById("inputAno").value || "";
+    perfil.peso = document.getElementById("inputPeso").value || "";
+    perfil.altura = document.getElementById("inputAltura").value || "";
+    perfil.genero = document.getElementById("inputGenero").value || "homem";
+    perfil.avatar = avatarSelecionado;
+    salvarPerfilStorage();
+    atualizarPerfilUI();
+    fecharModalPerfil();
+    primeiroAcesso = false;
+    mostrarFeedbackTemporario("✅ Perfil atualizado!", "verde");
+}
+
+function salvarPerfilStorage() {
+    localStorage.setItem("perfil", JSON.stringify(perfil));
+}
+
+// ============== PONTUAÇÃO ==============
+function calcularPontos(blocos, dist) {
+    let p = 0, tt = 0;
+    for (let b of blocos) {
+        let v = Number(b.vel) || 0, inc = Number(b.inc) || 0;
+        let sp = String(b.tempo || "00:00").split(":");
+        let m = (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
+        tt += m;
+        p += (v * 1.2 + inc * 2.0) * (m / 60);
+    }
+    let dk = Number(dist) || 0;
+    p += dk * 8;
+    if (tt > 30) p *= 1.08;
+    if (tt > 60) p *= 1.12;
+    if (tt > 90) p *= 1.18;
+    if (tt > 120) p *= 1.25;
+    return Math.round(p * 10) / 10;
+}
+
+function analisarTreino(p) {
+    if (p >= 200) return { texto:"🌟 DIVINO", classe:"divino", emoji:"🌟", nivel:"divino" };
+    if (p >= 150) return { texto:"💎 MÍTICO", classe:"mitico", emoji:"💎", nivel:"mitico" };
+    if (p >= 100) return { texto:"👑 LENDÁRIO", classe:"lendario", emoji:"👑", nivel:"lendario" };
+    if (p >= 70) return { texto:"🔥 ÉPICO", classe:"roxo", emoji:"🔥", nivel:"epico" };
+    if (p >= 50) return { texto:"💪 EXTREMO", classe:"vermelho", emoji:"💪", nivel:"extremo" };
+    if (p >= 35) return { texto:"⚡ INTENSO", classe:"amarelo", emoji:"⚡", nivel:"intenso" };
+    if (p >= 22) return { texto:"✅ MODERADO", classe:"verde", emoji:"✅", nivel:"moderado" };
+    if (p >= 12) return { texto:"🏃 LEVE", classe:"azul", emoji:"🏃", nivel:"leve" };
+    return { texto:"🌱 INICIANTE", classe:"azul", emoji:"🌱", nivel:"iniciante" };
+}
+
+function notaTreino(p) {
+    if (p >= 200) return 10;
+    if (p >= 150) return (9 + (p-150)/50).toFixed(1);
+    if (p >= 100) return (8 + (p-100)/50).toFixed(1);
+    if (p >= 70) return (7 + (p-70)/30).toFixed(1);
+    if (p >= 50) return (6 + (p-50)/20).toFixed(1);
+    return Math.min(10, Math.round((p/6)*10)/10).toFixed(1);
+}
+
+function getDuracaoTotal(blocos) {
+    let t = 0;
+    for (let b of blocos) {
+        let sp = String(b.tempo || "00:00").split(":");
+        t += (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
+    }
+    let h = Math.floor(t / 60), m = Math.round(t % 60);
+    return { horas: h, minutos: m, texto: h > 0 ? h+"h "+m+"min" : m+"min" };
+}
+
+function getVelocidadeMaximaPessoal() {
+    let max = 0;
+    for (let t of historico) {
+        for (let b of t.blocos) {
+            let v = Number(b.vel) || 0;
+            if (v > max) max = v;
         }
     }
     return max;
 }
 
-function gerarFeedbackInteligente(treino){
-    var blocos=treino.blocos,dist=treino.dist,duracaoMin=0;
-    for(var i=0;i<blocos.length;i++){var sp=String(blocos[i].tempo||"00:00").split(":");duracaoMin+=(Number(sp[0])||0)*60+(Number(sp[1])||0);}
-    var velMedia=0;for(var i=0;i<blocos.length;i++)velMedia+=Number(blocos[i].vel)||0;velMedia/=blocos.length;
-    var incMedia=0;for(var i=0;i<blocos.length;i++)incMedia+=Number(blocos[i].inc)||0;incMedia/=blocos.length;
-    var maiorVel=0,menorVel=999;for(var i=0;i<blocos.length;i++){var v=Number(blocos[i].vel)||0;if(v>maiorVel)maiorVel=v;if(v<menorVel)menorVel=v;}
-    var dur=getDuracaoTotal(blocos);
-    var idade=getIdade(),peso=Number(perfil.peso)||0,genero=perfil.genero;
-    var velMaxPessoal=getVelocidadeMaximaPessoal();
-    if(velMaxPessoal===0)velMaxPessoal=maiorVel;
-    
-    // ESTRUTURA - análise real
-    var estrutura=[];
-    var primeiraVel=Number(blocos[0].vel)||0;
-    var ultimaVel=Number(blocos[blocos.length-1].vel)||0;
-    var teveAquecimento=blocos.length>=2&&primeiraVel<velMedia&&(primeiraVel<maiorVel*0.7);
-    var teveDesaquecimento=blocos.length>=2&&ultimaVel<velMedia&&(ultimaVel<maiorVel*0.7);
-    
-    if(teveAquecimento)estrutura.push("🟢 Começou mais leve, bom aquecimento!");
-    else if(blocos.length>=2&&primeiraVel>=velMedia)estrutura.push("⚠️ Já começou em ritmo forte. Considere um aquecimento leve.");
-    
-    if(teveDesaquecimento)estrutura.push("🔵 Terminou reduzindo, ótimo desaquecimento.");
-    else if(blocos.length>=2&&ultimaVel>=velMedia&&duracaoMin>20)estrutura.push("⚠️ Terminou em ritmo alto. Tente reduzir nos últimos minutos.");
-    
-    if(maiorVel>velMedia*1.3)estrutura.push("🔺 Picos de velocidade detectados!");
-    if(estrutura.length===0)estrutura.push("➡️ Ritmo constante do início ao fim.");
-
-    // OBSERVAÇÕES
-    var observacoes=[];
-    if(idade&&idade>50&&velMedia>8)observacoes.push("Velocidade excelente para sua idade! 👏");
-    if(idade&&idade<20&&duracaoMin>60)observacoes.push("Jovem e resistente! Cuidado com overtraining.");
-    if(peso>90&&incMedia>3)observacoes.push("Ótimo trabalho com inclinação! Protege as articulações.");
-    if(genero==="mulher"&&velMedia>7)observacoes.push("Velocidade feminina de elite! 🚀");
-    if(velMedia<5)observacoes.push("Velocidade média baixa. Aumente 0.5 km/h por semana.");
-    if(duracaoMin<15&&treino.pontos<10)observacoes.push("Treino curto. Mire em 20-30 min.");
-    if(!blocos.some(function(b){return Number(b.inc)>=4;}))observacoes.push("Pouca inclinação. Adicione subidas!");
-    if(observacoes.length===0)observacoes.push("Parâmetros muito equilibrados! 👏");
-
-    // SUGESTÕES - baseadas no máximo real da pessoa
-    var sugestoes=[];
-    var tiroVel=Math.round(velMaxPessoal*1.1*10)/10;
-    if(tiroVel<=velMaxPessoal)tiroVel=Math.round((velMaxPessoal+1)*10)/10;
-    
-    if(duracaoMin>40)sugestoes.push("Que tal 1-2 min a "+tiroVel+" km/h? (seu máximo foi "+velMaxPessoal+" km/h)");
-    else if(duracaoMin>25&&maiorVel<velMaxPessoal)sugestoes.push("Tente um pico de "+tiroVel+" km/h por 30 segundos.");
-    
-    if(blocos.every(function(b){return Number(b.inc)===0;}))sugestoes.push("Alterne inclinação: 2 min de subida, 2 min no plano.");
-    if(velMedia<velMaxPessoal*0.7)sugestoes.push("Você já fez "+velMaxPessoal+" km/h antes. Tente manter "+Math.round(velMaxPessoal*0.85*10)/10+" km/h.");
-    
-    if(historico.length>2){
-        var ults=historico.filter(function(t){return t.id!==treino.id;}).slice(-3);
-        var mp=0;for(var i=0;i<ults.length;i++)mp+=ults[i].pontos||0;mp/=ults.length;
-        if(treino.pontos>mp*1.2)sugestoes.push("🔥 Superou sua média! Continue assim!");
+// ============== FEEDBACK INTELIGENTE (MELHORADO) ==============
+function gerarFeedbackInteligente(treino) {
+    let blocos = treino.blocos, dist = treino.dist, duracaoMin = 0;
+    for (let b of blocos) {
+        let sp = String(b.tempo || "00:00").split(":");
+        duracaoMin += (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
     }
-    if(sugestoes.length===0)sugestoes.push("Continue consistente! Você está evoluindo bem. 🚀");
+    duracaoMin /= 60;
+    let velMedia = blocos.reduce((s, b) => s + (Number(b.vel)||0), 0) / blocos.length;
+    let incMedia = blocos.reduce((s, b) => s + (Number(b.inc)||0), 0) / blocos.length;
+    let maiorVel = Math.max(...blocos.map(b => Number(b.vel)||0));
+    let dur = getDuracaoTotal(blocos);
+    let idade = getIdade(), peso = Number(perfil.peso) || 0, altura = Number(perfil.altura) || 0;
+    let genero = perfil.genero;
+    let imc = getIMC();
+    let velMaxPessoal = getVelocidadeMaximaPessoal();
+    if (velMaxPessoal === 0) velMaxPessoal = maiorVel;
 
-    return'<div class="feedback-inteligente"><span style="font-weight:700;">🧠 Análise Inteligente</span><p><span class="secao-titulo">📋 RESUMO</span>⏱️ '+dur.texto+' | 📏 '+dist+' km | ⚡ Média: '+velMedia.toFixed(1)+' km/h | Máx: '+maiorVel+' km/h | 📈 Inc: '+incMedia.toFixed(0)+'%</p><p><span class="secao-titulo">🔍 ESTRUTURA</span>'+estrutura.join(' ')+'</p><p><span class="secao-titulo">⚠️ OBSERVAÇÕES</span>'+observacoes.join(' ')+'</p><p><span class="secao-titulo">💡 SUGESTÕES</span>'+sugestoes.join(' ')+'</p></div>';
+    let estrutura = [];
+    let primeiraVel = Number(blocos[0].vel) || 0;
+    let ultimaVel = Number(blocos[blocos.length-1].vel) || 0;
+    let teveAquecimento = blocos.length >= 2 && primeiraVel < velMedia && (primeiraVel < maiorVel * 0.7);
+    let teveDesaquecimento = blocos.length >= 2 && ultimaVel < velMedia && (ultimaVel < maiorVel * 0.7);
+    if (teveAquecimento) estrutura.push("🟢 Começou mais leve, bom aquecimento!");
+    else if (blocos.length >= 2 && primeiraVel >= velMedia) estrutura.push("⚠️ Já começou em ritmo forte. Considere um aquecimento leve.");
+    if (teveDesaquecimento) estrutura.push("🔵 Terminou reduzindo, ótimo desaquecimento.");
+    else if (blocos.length >= 2 && ultimaVel >= velMedia && duracaoMin > 20) estrutura.push("⚠️ Terminou em ritmo alto. Tente reduzir nos últimos minutos.");
+    if (maiorVel > velMedia * 1.3) estrutura.push("🔺 Picos de velocidade detectados!");
+    if (estrutura.length === 0) estrutura.push("➡️ Ritmo constante do início ao fim.");
+
+    let observacoes = [];
+    if (idade && idade > 50 && velMedia > 8) observacoes.push("Velocidade excelente para sua idade! 👏");
+    if (idade && idade < 20 && duracaoMin > 60) observacoes.push("Jovem e resistente! Cuidado com overtraining.");
+    if (imc && imc >= 30) {
+        observacoes.push("🔸 Sobrepeso/Obesidade: priorize inclinação e caminhada para proteger articulações.");
+        if (incMedia < 3) observacoes.push("Aumente a inclinação para queimar mais com menos impacto.");
+    } else if (imc && imc >= 25) {
+        observacoes.push("Leve sobrepeso: incluir treinos intervalados pode acelerar resultados.");
+    }
+    if (peso > 90 && incMedia > 3) observacoes.push("Ótimo trabalho com inclinação! Protege as articulações.");
+    if (genero === "mulher" && velMedia > 7) observacoes.push("Velocidade feminina de elite! 🚀");
+    if (velMedia < 5) observacoes.push("Velocidade média baixa. Aumente 0.5 km/h por semana.");
+    if (duracaoMin < 15 && treino.pontos < 10) observacoes.push("Treino curto. Mire em 20-30 min.");
+    if (!blocos.some(b => Number(b.inc) >= 4)) observacoes.push("Pouca inclinação. Adicione subidas!");
+    if (observacoes.length === 0) observacoes.push("Parâmetros muito equilibrados! 👏");
+
+    let agora = new Date();
+    let seteDiasAtras = new Date(agora);
+    seteDiasAtras.setDate(agora.getDate() - 7);
+    let recentes = historico.filter(t => {
+        let [y, m, d] = t.data.split('-').map(Number);
+        let data = new Date(y, m-1, d);
+        return data >= seteDiasAtras && data <= agora && t.id !== treino.id;
+    });
+
+    let sugestoes = [];
+    if (recentes.length >= 2) {
+        let velRecentes = recentes.flatMap(t => t.blocos.map(b => Number(b.vel)||0));
+        let mediaVelRecente = velRecentes.reduce((a,b)=>a+b,0)/velRecentes.length;
+        let distMediaRecente = recentes.reduce((s,t)=>s+(Number(t.dist)||0),0)/recentes.length;
+        let durMediaRecente = recentes.reduce((s,t)=>{
+            let sp = t.duracao.split(/[hm]+/).map(Number);
+            return s + (sp[0]||0)*60 + (sp[1]||0);
+        },0)/recentes.length;
+
+        if (velMedia > mediaVelRecente * 1.05) sugestoes.push("📈 Velocidade média acima da sua média recente! Continue acelerando.");
+        else if (velMedia < mediaVelRecente * 0.95) sugestoes.push("📉 Velocidade um pouco abaixo do seu normal. Tente voltar ao ritmo anterior.");
+        else sugestoes.push("⚖️ Velocidade estável, mantendo boa consistência.");
+
+        if (dist > distMediaRecente * 1.1) sugestoes.push("🎯 Distância maior que a média da semana, excelente evolução!");
+        if (duracaoMin > (durMediaRecente/60) * 1.1) sugestoes.push("⏳ Duração acima da média, mostrando resistência.");
+    } else {
+        sugestoes.push("📊 Treine mais alguns dias para receber análises de tendência!");
+    }
+
+    let tiroVel = Math.round(velMaxPessoal * 1.1 * 10) / 10;
+    if (tiroVel <= velMaxPessoal) tiroVel = Math.round((velMaxPessoal + 1) * 10) / 10;
+    if (duracaoMin > 40) sugestoes.push("Que tal 1-2 min a "+tiroVel+" km/h? (seu máximo foi "+velMaxPessoal+" km/h)");
+    else if (duracaoMin > 25 && maiorVel < velMaxPessoal) sugestoes.push("Tente um pico de "+tiroVel+" km/h por 30 segundos.");
+    if (blocos.every(b => Number(b.inc) === 0)) sugestoes.push("Alterne inclinação: 2 min de subida, 2 min no plano.");
+
+    if (historico.length > 2) {
+        let ults = historico.filter(t => t.id !== treino.id).slice(-3);
+        let mp = 0;
+        for (let t of ults) mp += t.pontos || 0;
+        mp /= ults.length;
+        if (treino.pontos > mp * 1.2) sugestoes.push("🔥 Superou sua média! Continue assim!");
+    }
+    if (sugestoes.length === 0) sugestoes.push("Continue consistente! Você está evoluindo bem. 🚀");
+
+    return `<div class="feedback-inteligente"><span style="font-weight:700;">🧠 Análise Inteligente</span>
+    <p><span class="secao-titulo">📋 RESUMO</span>⏱️ ${dur.texto} | 📏 ${dist} km | ⚡ Média: ${velMedia.toFixed(1)} km/h | Máx: ${maiorVel} km/h | 📈 Inc: ${incMedia.toFixed(0)}%</p>
+    <p><span class="secao-titulo">🔍 ESTRUTURA</span>${estrutura.join(' ')}</p>
+    <p><span class="secao-titulo">⚠️ OBSERVAÇÕES</span>${observacoes.join(' ')}</p>
+    <p><span class="secao-titulo">📊 TENDÊNCIA</span>${sugestoes.join(' ')}</p>
+    </div>`;
 }
 
-function trocarComAnimacao(pag,el){
-    var pages=['home','cal','prog','ajustes'];for(var i=0;i<pages.length;i++){var p=document.getElementById(pages[i]);if(p)p.style.display='none';}
-    var t=document.getElementById(pag);if(t)t.style.display='block';
-    var navs=document.querySelectorAll(".nav-btn");for(var i=0;i<navs.length;i++)navs[i].classList.remove("active-nav");
-    if(el)el.classList.add("active-nav");
-    if(pag==="prog")setTimeout(atualizarProgresso,150);
-    if(pag==="cal"){renderCalendario();renderSemana();}
-    if(pag==="ajustes")renderAjustes();
-    if(pag==="home"){atualizarPerfilUI();atualizarLembrete();if(!dataRetroativa)limparDataRetroativa();}
+// ============== UI CONTROLES ==============
+function mostrarFeedbackTemporario(msg, cl) {
+    let fb = document.getElementById("feedback");
+    fb.className = 'card feedback-card ' + cl;
+    fb.innerHTML = msg;
+    fb.style.display = "block";
+    setTimeout(() => { fb.style.display = "none"; }, 4000);
 }
 
-function setDataRetroativa(d){dataRetroativa=d;var info=document.getElementById("dataRetroativaInfo");if(info){document.getElementById("dataRetroativaTexto").textContent=new Date(d).toLocaleDateString('pt-BR');info.style.display='block';}var btn=document.querySelector('.btn-primary');if(btn){btn.textContent='📅 Salvar (Retroativo)';btn.style.background='linear-gradient(135deg,#ff9100,#ff6d00)';btn.style.color='white';}}
-function limparDataRetroativa(){dataRetroativa=null;var info=document.getElementById("dataRetroativaInfo");if(info)info.style.display='none';var btn=document.querySelector('.btn-primary');if(btn){btn.textContent='✅ Salvar Treino';btn.style.background='linear-gradient(135deg,#00e676 0%,#00c853 100%)';btn.style.color='#000';}}
-function toggleHorario(){horarioVisivel=!horarioVisivel;document.getElementById("horarioFields").style.display=horarioVisivel?"block":"none";document.getElementById("horarioToggleIcon").textContent=horarioVisivel?"▼":"▶";}
-function atualizarTempoTotal(){var dur=getDuracaoTotal(treinoAtual);document.getElementById("tempoTotalDisplay").innerHTML="⏱️ "+dur.texto;}
-function atualizarContadorTreinos(){var q=treinoAtual.length;document.getElementById("contadorTreinos").innerText=q+" treino"+(q!==1?'s':'');}
-function novoTreinoComAnimacao(){treinoAtual.push({vel:"",inc:"",tempo:"00:00"});renderBlocos();atualizarContadorTreinos();atualizarTempoTotal();}
-function renderBlocos(){var html='<div class="row" style="margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);"><div class="label">VEL (km/h)</div><div class="label">INC (%)</div><div class="label">DURAÇÃO</div><div></div></div>';for(var i=0;i<treinoAtual.length;i++){var t=treinoAtual[i];html+='<div class="row">'+'<input type="number" value="'+t.vel+'" placeholder="0" step="0.1" onchange="treinoAtual['+i+'].vel=this.value;atualizarTempoTotal()">'+'<input type="number" value="'+t.inc+'" placeholder="0" step="0.5" onchange="treinoAtual['+i+'].inc=this.value;atualizarTempoTotal()">'+'<input class="time-input" value="'+t.tempo+'" onfocus="this.select()" oninput="mascaraTempo(this,'+i+')" onblur="formatarTempo(this,'+i+')">'+'<button class="btn-icon" onclick="removerTreino('+i+')">✕</button></div>';}document.getElementById("blocos").innerHTML=html;atualizarTempoTotal();}
-function removerTreino(i){treinoAtual.splice(i,1);renderBlocos();atualizarContadorTreinos();atualizarTempoTotal();}
-function mascaraTempo(el,i){var v=el.value.replace(/\D/g,'');if(v.length>4)v=v.slice(0,4);el.value=v.length<=2?v:v.slice(0,v.length-2)+':'+v.slice(v.length-2);treinoAtual[i].tempo=el.value;atualizarTempoTotal();}
-function formatarTempo(el,i){var v=el.value.replace(/\D/g,'');if(!v){el.value="00:00";treinoAtual[i].tempo="00:00";atualizarTempoTotal();return;}v=v.padStart(4,'0');var mm=v.slice(0,2),ss=v.slice(2);if(Number(ss)>59)ss="59";if(Number(mm)>99)mm="99";el.value=mm+":"+ss;treinoAtual[i].tempo=el.value;atualizarTempoTotal();}
-function abrirModal(t,m,c,ct){document.getElementById("modalTitle").textContent=t;document.getElementById("modalMessage").textContent=m;document.getElementById("modalConfirmBtn").textContent=ct||"Confirmar";document.getElementById("modalOverlay").style.display="flex";modalCallback=c;}
-function fecharModal(){document.getElementById("modalOverlay").style.display="none";modalCallback=null;}
-document.getElementById("modalConfirmBtn").onclick=function(){if(modalCallback)modalCallback();fecharModal();};
-document.getElementById("modalOverlay").addEventListener("click",function(e){if(e.target===this)fecharModal();});
-
-function salvarTreinoComFeedback(){
-    if(treinoAtual.length===0){mostrarFeedbackTemporario("⚠️ Adicione pelo menos um treino!","vermelho");return;}
-    var dist=Number(document.getElementById("distanciaManual").value)||0;
-    var pontos=calcularPontos(treinoAtual,dist),analise=analisarTreino(pontos),nota=notaTreino(pontos);
-    var h1=document.getElementById("horaInicio").value||null,h2=document.getElementById("horaFim").value||null;
-    var dataTreino=dataRetroativa?new Date(dataRetroativa):new Date();
-    var recordeBatido=false,melhorDoMes=obterMelhorDoMes(dataTreino.getMonth(),dataTreino.getFullYear());
-    if(!melhorDoMes||pontos>melhorDoMes.pontos)recordeBatido=true;
-    var dur=getDuracaoTotal(treinoAtual),kmMes=getKmDoMes(dataTreino.getMonth(),dataTreino.getFullYear())+dist;
-    var horarioTexto="";if(h1&&h2)horarioTexto='<div class="horario-salvo">🕐 '+h1+' → '+h2+'</div>';else if(h1)horarioTexto='<div class="horario-salvo">🕐 Início: '+h1+'</div>';
-    var conquistasMsg="";if(kmMes>=50)conquistasMsg='<div class="conquistas-mes">🏅 50KM NO MÊS!</div>';else if(kmMes>=25)conquistasMsg='<div class="conquistas-mes">🎯 25KM NO MÊS!</div>';
-    var feedbackSalvo=gerarFeedbackInteligente({blocos:treinoAtual,dist:dist,pontos:pontos,id:Date.now()});
-    var novo={id:Date.now(),data:dataTreino.toISOString(),dist:dist,blocos:JSON.parse(JSON.stringify(treinoAtual)),pontos:pontos,classe:analise.classe,tipo:analise.texto,emoji:analise.emoji,nota:Number(nota),recorde:recordeBatido,horaInicio:h1,horaFim:h2,nivel:analise.nivel||null,retroativo:!!dataRetroativa,duracao:dur.texto,feedback:feedbackSalvo};
-    historico.push(novo);localStorage.setItem("historico",JSON.stringify(historico));
-    var comp=obterComparacao(novo);
-    var msg='<div class="pontos-surpresa"><div class="pontos-valor">'+pontos+'</div><div class="pontos-label">PONTOS</div><div style="font-size:18px;">'+analise.emoji+' '+analise.texto+'</div><div>⭐ '+nota+'/10</div><div class="tempo-salvo">⏱️ '+dur.texto+'</div>'+horarioTexto+(dataRetroativa?'<div style="color:var(--orange);">📅 Retroativo</div>':'')+'<div>'+comp+'</div>'+(recordeBatido?'<div>🏆 RECORDE DO MÊS!</div>':'')+conquistasMsg+'</div>';
-    mostrarFeedbackTemporario(msg,analise.classe);
-    if(recordeBatido)criarParticulas();
-    document.getElementById("feedbackInteligente").innerHTML=feedbackSalvo;
-    document.getElementById("feedbackInteligente").style.display="block";
-    treinoAtual=[];renderBlocos();atualizarContadorTreinos();atualizarTempoTotal();
-    document.getElementById("distanciaManual").value="";document.getElementById("horaInicio").value="";document.getElementById("horaFim").value="";
-    if(horarioVisivel)toggleHorario();limparDataRetroativa();renderSemana();renderCalendario();atualizarLembrete();
+function criarParticulas() {
+    let fb = document.getElementById("feedback");
+    if (!fb) return;
+    let emojis = ["🎉","✨","🏆","⭐"];
+    for (let i = 0; i < 10; i++) {
+        let p = document.createElement("span");
+        p.className = "particle";
+        p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        p.style.left = Math.random() * 80 + 10 + "%";
+        p.style.top = Math.random() * 80 + 10 + "%";
+        p.style.fontSize = (Math.random() * 20 + 10) + "px";
+        fb.appendChild(p);
+        setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, 1500);
+    }
 }
 
-function getKmDoMes(mes,ano){var km=0;for(var i=0;i<historico.length;i++){var d=new Date(historico[i].data);if(d.getMonth()===mes&&d.getFullYear()===ano)km+=historico[i].dist||0;}return km;}
-function obterComparacao(n){var ant=[];for(var i=0;i<historico.length;i++){if(historico[i].id!==n.id)ant.push(historico[i]);}if(ant.length===0)return"🎯 Primeiro!";ant.sort(function(a,b){return new Date(b.data)-new Date(a.data);});var u=ant[0];var diff=n.pontos-u.pontos;var pct=u.pontos>0?Math.round((diff/u.pontos)*100):0;if(diff>10)return'<span class="comparacao-badge comparacao-up">🚀 +'+pct+'%</span>';if(diff>0)return'<span class="comparacao-badge comparacao-up">📈 +'+pct+'%</span>';if(diff===0)return'<span class="comparacao-badge comparacao-same">➡️ Igual</span>';return'<span class="comparacao-badge comparacao-down">📉 '+pct+'%</span>';}
-function obterMelhorDoMes(m,a){var melhor=null;for(var i=0;i<historico.length;i++){var d=new Date(historico[i].data);if(d.getMonth()===m&&d.getFullYear()===a){if(!melhor||historico[i].pontos>melhor.pontos)melhor=historico[i];}}return melhor;}
-function mostrarFeedbackTemporario(msg,cl){var fb=document.getElementById("feedback");fb.className='card feedback-card '+cl;fb.innerHTML=msg;fb.style.display="block";setTimeout(function(){fb.style.display="none";},4000);}
-function criarParticulas(){var fb=document.getElementById("feedback");if(!fb)return;var emojis=["🎉","✨","🏆","⭐"];for(var i=0;i<10;i++){var p=document.createElement("span");p.className="particle";p.textContent=emojis[Math.floor(Math.random()*emojis.length)];p.style.left=Math.random()*80+10+"%";p.style.top=Math.random()*80+10+"%";p.style.fontSize=(Math.random()*20+10)+"px";fb.appendChild(p);setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},1500);}}
-function excluirTreino(id,ds){treinoParaExcluir={id:id,dataStr:ds};abrirModal("🗑️ Excluir","Tem certeza?",function(){var nh=[];for(var i=0;i<historico.length;i++){if(historico[i].id!==treinoParaExcluir.id)nh.push(historico[i]);}historico=nh;localStorage.setItem("historico",JSON.stringify(historico));renderCalendario();renderSemana();abrirDia(treinoParaExcluir.dataStr);atualizarLembrete();},"Excluir");}
-function resetarComConfirmacao(){abrirModal("⚠️ Resetar","Apagar TUDO?",function(){localStorage.removeItem("historico");historico=[];treinoAtual=[];renderBlocos();atualizarContadorTreinos();atualizarTempoTotal();renderSemana();renderCalendario();document.getElementById("detalheDia").innerHTML="";for(var k in graficos){if(graficos[k])graficos[k].destroy();}graficos={};mostrarFeedbackTemporario("✅ Resetado!","verde");atualizarLembrete();},"Resetar");}
-function keyData(d){var dt=new Date(d);return dt.getFullYear()+"-"+(dt.getMonth()+1)+"-"+dt.getDate();}
-
-function verificarStatusSemana(dataSabado){var hoje=new Date();if(dataSabado>hoje)return'<div class="cell-status"></div>';var inicio=new Date(dataSabado);inicio.setDate(dataSabado.getDate()-6);inicio.setHours(0,0,0,0);var fim=new Date(dataSabado);fim.setHours(23,59,59,999);var c=0;for(var i=0;i<historico.length;i++){var d=new Date(historico[i].data);if(d>=inicio&&d<=fim)c++;}return'<div class="cell-status">'+(c>=metaSemanal?'✅':'❌')+'</div>';}
-
-function renderCalendario(){
-    document.getElementById("tituloMes").innerText=new Date(anoAtual,mesAtual).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-    if(mostrandoMeses){var nomes=["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];var html='<div class="meses-grid">';for(var i=0;i<nomes.length;i++)html+='<div class="mes-item'+(i===mesAtual?' selecionado':'')+'" onclick="trocarMes('+i+')">'+nomes[i]+'</div>';html+='</div>';document.getElementById("mesGrid").innerHTML=html;document.getElementById("conquistasDoMes").innerHTML="";return;}
-    var primeiro=new Date(anoAtual,mesAtual,1).getDay(),dias=new Date(anoAtual,mesAtual+1,0).getDate(),hoje=new Date();
-    var mapa={};for(var i=0;i<historico.length;i++){var k=keyData(historico[i].data);if(!mapa[k])mapa[k]=[];mapa[k].push(historico[i]);}
-    var melhor=obterMelhorDoMes(mesAtual,anoAtual);
-    var htmlFinal="",contadorDia=0;
-    for(var i=0;i<primeiro;i++){htmlFinal+="<div></div>";contadorDia++;if(contadorDia%7===0)htmlFinal+='<div class="cell-status"></div>';}
-    for(var d=1;d<=dias;d++){var data=new Date(anoAtual,mesAtual,d),lista=mapa[keyData(data)],treino=lista?lista.reduce(function(a,b){return a.pontos>b.pontos?a:b;}):null;var classeFinal=treino?treino.classe:"",temTreino=treino?"tem-treino":"";if(treino&&melhor&&treino.id===melhor.id&&classeFinal!=="amarelo"&&classeFinal!=="lendario"&&classeFinal!=="mitico"&&classeFinal!=="divino")classeFinal="amarelo";htmlFinal+='<div class="cell '+classeFinal+' '+temTreino+'" onclick="abrirDiaComAnimacao(\''+data.toISOString()+'\')">'+d+'</div>';contadorDia++;if(contadorDia%7===0)htmlFinal+=verificarStatusSemana(data);}
-    while(contadorDia%7!==0){htmlFinal+="<div></div>";contadorDia++;}
-    htmlFinal+='<div class="cell-status"></div>';
-    document.getElementById("mesGrid").innerHTML=htmlFinal;
-    var kmMes=getKmDoMes(mesAtual,anoAtual),conquistasDiv=document.getElementById("conquistasDoMes");
-    if(conquistasDiv){var msg="";if(kmMes>=50)msg="🏅 50KM no mês!";else if(kmMes>=25)msg="🎯 25KM no mês!";else msg="📏 "+kmMes.toFixed(1)+" km este mês";conquistasDiv.innerHTML=msg;}
+function setDataRetroativa(d) {
+    dataRetroativa = d;
+    editandoId = null;
+    document.getElementById("modoEdicaoInfo").style.display = "none";
+    let info = document.getElementById("dataRetroativaInfo");
+    document.getElementById("dataRetroativaTexto").textContent = d;
+    info.style.display = 'block';
+    let btn = document.querySelector('.btn-primary');
+    btn.textContent = '📅 Salvar (Retroativo)';
+    btn.style.background = 'linear-gradient(135deg,#ff9100,#ff6d00)';
+    btn.style.color = 'white';
 }
 
-function renderSemana(){var hoje=new Date(),d=hoje.getDay(),nomes=["DOM","SEG","TER","QUA","QUI","SEX","SÁB"],html="";for(var i=0;i<7;i++){var data=new Date(hoje);data.setDate(hoje.getDate()-d+i);var treinos=[];for(var j=0;j<historico.length;j++){if(keyData(historico[j].data)===keyData(data))treinos.push(historico[j]);}var best=null;if(treinos.length>0){best=treinos[0];for(var j=1;j<treinos.length;j++){if(treinos[j].pontos>best.pontos)best=treinos[j];}}html+='<div class="day '+(i===d?'today':'')+'" style="'+(best?'background:linear-gradient(135deg,#00e67620,#00c85320);border-color:#00e676;':'')+'" onclick="abrirDiaComAnimacao(\''+data.toISOString()+'\')">'+nomes[i]+'<br><span style="font-size:15px;">'+data.getDate()+'</span></div>';}document.getElementById("semanaHome").innerHTML=html;document.getElementById("semanaCal").innerHTML=html;}
-
-function abrirDiaComAnimacao(data){var chave=keyData(data),lista=[];for(var i=0;i<historico.length;i++){if(keyData(historico[i].data)===chave)lista.push(historico[i]);}var detalheDiv=document.getElementById("detalheDia"),dataObj=new Date(data),hoje=new Date();if(!lista.length){var html="<div class='card' style='text-align:center;'><div style='font-size:44px;'>📅</div><div>"+dataObj.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})+"</div><div style='color:var(--text2);'>Nenhum treino</div>";if(dataObj<=hoje)html+="<button class='btn-registrar' onclick=\"registrarTreinoEsquecido('"+data+"')\">📝 Registrar Treino</button>";html+="</div>";detalheDiv.innerHTML=html;return;}lista.sort(function(a,b){return b.pontos-a.pontos;});var html="";for(var i=0;i<lista.length;i++){var t=lista[i],nt=notaTreino(t.pontos),df=new Date(t.data).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});var horarioInfo="";if(t.horaInicio&&t.horaFim)horarioInfo='<div style="font-size:11px;color:var(--text2);">🕐 '+t.horaInicio+' → '+t.horaFim+'</div>';else if(t.horaInicio)horarioInfo='<div style="font-size:11px;color:var(--text2);">🕐 '+t.horaInicio+'</div>';html+='<div class="card '+t.classe+' '+(t.recorde?'record-batido':'')+'"><div style="display:flex;justify-content:space-between;"><span>'+(t.emoji||'')+' '+t.tipo+'</span><span>⭐ '+nt+'/10</span></div><div>📅 '+df+' | 📏 '+t.dist+' km | 🎯 '+t.pontos+' pts | ⏱️ '+(t.duracao||'')+'</div>'+horarioInfo+'<hr>';for(var j=0;j<t.blocos.length;j++){var b=t.blocos[j];html+='🔹 Treino '+(j+1)+': '+(b.vel||0)+' km/h | '+(b.inc||0)+'% | '+(b.tempo||'00:00')+'<br>';}html+='<div style="text-align:right;"><button class="btn-delete" onclick="excluirTreino('+t.id+',\''+t.data+'\')">🗑️ Excluir</button></div>';if(t.feedback)html+='<div style="margin-top:10px;">'+t.feedback+'</div>';html+='</div>';}detalheDiv.innerHTML=html;}
-
-function registrarTreinoEsquecido(d){setDataRetroativa(d);trocarComAnimacao('home',document.querySelector('.nav-btn'));mostrarFeedbackTemporario("📅 Preencha os dados para "+new Date(d).toLocaleDateString('pt-BR'),"azul");}
-function mudarMes(dir){mesAtual+=dir;if(mesAtual<0){mesAtual=11;anoAtual--;}if(mesAtual>11){mesAtual=0;anoAtual++;}renderCalendario();}
-function toggleMeses(){mostrandoMeses=!mostrandoMeses;renderCalendario();}
-function trocarMes(m){mesAtual=m;mostrandoMeses=false;renderCalendario();}
-
-function atualizarLembrete(){var hoje=new Date(),inicio=new Date(hoje);inicio.setDate(hoje.getDate()-hoje.getDay());inicio.setHours(0,0,0,0);var c=0;for(var i=0;i<historico.length;i++){if(new Date(historico[i].data)>=inicio)c++;}var f=metaSemanal-c,dr=7-hoje.getDay(),card=document.getElementById("lembreteCard");if(f<=0){card.innerHTML='🏆 Meta batida! '+c+'/'+metaSemanal;card.style.borderColor="var(--yellow)";}else if(dr<=2&&f>=2){card.innerHTML='⚠️ Faltam '+f+' treinos, '+dr+' dia(s)!';card.style.borderColor="var(--red)";}else{card.innerHTML='💪 Faltam '+f+' treino(s).';card.style.borderColor="var(--purple)";}card.style.display="block";}
-
-function setMetaSemanal(v){metaSemanal=v;localStorage.setItem("metaSemanal",JSON.stringify(metaSemanal));var chips=document.querySelectorAll("#metaSemanalSelector .meta-chip"),vals=[2,3,4,5,6,7];for(var i=0;i<chips.length;i++){if(vals[i]===v)chips[i].classList.add("selecionado");else chips[i].classList.remove("selecionado");}var msg=document.getElementById("metaSalvaMsg");msg.style.display="block";setTimeout(function(){msg.style.display="none";},2000);atualizarLembrete();renderCalendario();renderSemana();}
-
-function getBadges(mes,ano){var kmMes=getKmDoMes(mes,ano),treinosMes=0,recordMes=false,lendarioMes=false,miticoMes=false,divinoMes=false,madrugador=false,noturno=false;for(var i=0;i<historico.length;i++){var d=new Date(historico[i].data);if(d.getMonth()===mes&&d.getFullYear()===ano){treinosMes++;if(historico[i].recorde)recordMes=true;if(historico[i].pontos>=100)lendarioMes=true;if(historico[i].pontos>=150)miticoMes=true;if(historico[i].pontos>=200)divinoMes=true;if(historico[i].horaInicio&&historico[i].horaInicio<"07:00")madrugador=true;if(historico[i].horaFim&&historico[i].horaFim>="20:00")noturno=true;}}var geralTreinos=historico.length;return[{id:"t1",nome:"1º do Mês",desc:"Primeiro",icon:"🥇",c:function(){return treinosMes>=1;}},{id:"3s",nome:"3 na Semana",desc:"3 em 7 dias",icon:"🔥",c:function(){var hoje=new Date(),ini=new Date(hoje);ini.setDate(hoje.getDate()-7);var c=0;for(var i=0;i<historico.length;i++){if(new Date(historico[i].data)>=ini)c++;}return c>=3;}},{id:"5m",nome:"5 no Mês",desc:"5 treinos",icon:"⚡",c:function(){return treinosMes>=5;}},{id:"10m",nome:"10 no Mês",desc:"10 treinos",icon:"💪",c:function(){return treinosMes>=10;}},{id:"km25",nome:"25KM",desc:"25 km",icon:"🛣️",c:function(){return kmMes>=25;}},{id:"km50",nome:"50KM",desc:"50 km",icon:"🏅",c:function(){return kmMes>=50;}},{id:"rec",nome:"Recorde",desc:"Bateu",icon:"👑",c:function(){return recordMes;}},{id:"mad",nome:"Madrugador",desc:"< 7h",icon:"🌅",c:function(){return madrugador;}},{id:"not",nome:"Noturno",desc:"> 20h",icon:"🌙",c:function(){return noturno;}},{id:"len",nome:"Lendário",desc:"100+ pts",icon:"💎",c:function(){return lendarioMes;}},{id:"mit",nome:"Mítico",desc:"150+ pts",icon:"🌟",c:function(){return miticoMes;}},{id:"div",nome:"Divino",desc:"200+ pts",icon:"👑",c:function(){return divinoMes;}},{id:"g10",nome:"Maratonista",desc:"10 total",icon:"🏃",c:function(){return geralTreinos>=10;}},{id:"gdist",nome:"10km+",desc:"Treino 10km+",icon:"📏",c:function(){for(var i=0;i<historico.length;i++){if(historico[i].dist>=10)return true;}return false;}}];}
-
-function renderBadges(mes,ano){var grid=document.getElementById("badgeGrid");if(!grid)return;var badges=getBadges(mes,ano),html="";for(var i=0;i<badges.length;i++){var d=badges[i].c();html+='<div class="badge-item '+(d?'desbloqueado':'bloqueado')+'"><div class="badge-icon">'+badges[i].icon+'</div><div class="badge-nome">'+badges[i].nome+'</div><div class="badge-desc">'+badges[i].desc+'</div>'+(d?'✅':'🔒')+'</div>';}grid.innerHTML=html;}
-
-function exportarDados(){var dados={historico:historico,metaSemanal:metaSemanal,perfil:perfil,exportadoEm:new Date().toISOString(),versao:"11.0"};var blob=new Blob([JSON.stringify(dados)],{type:"application/json"});var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="elevup-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();}
-function importarDados(){document.getElementById("importFile").click();}
-function processarImportacao(event){var file=event.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){try{var dados=JSON.parse(e.target.result);if(!dados.historico||!Array.isArray(dados.historico))throw new Error("Inválido");abrirModal("Importar",dados.historico.length+" treinos. Substituir?",function(){historico=dados.historico;metaSemanal=dados.metaSemanal||3;if(dados.perfil)perfil=dados.perfil;localStorage.setItem("historico",JSON.stringify(historico));localStorage.setItem("metaSemanal",JSON.stringify(metaSemanal));localStorage.setItem("perfil",JSON.stringify(perfil));renderCalendario();renderSemana();renderAjustes();atualizarLembrete();atualizarPerfilUI();},"Importar");}catch(err){mostrarFeedbackTemporario("❌ Arquivo inválido","vermelho");}};reader.readAsText(file);event.target.value="";}
-
-function atualizarProgresso(){atualizarEvolucao();atualizarRanking();atualizarGraficos();atualizarResumo();atualizarComparacaoMes();}
-function atualizarEvolucao(){var card=document.getElementById("cardEvolucao");if(historico.length<2){card.style.display="none";return;}card.style.display="block";var ord=historico.slice().sort(function(a,b){return new Date(a.data)-new Date(b.data);}),ult=ord[ord.length-1],meta=Math.round((ult.pontos*1.1+5)/2);if(meta<=ult.pontos)meta=Math.round(ult.pontos*1.15);document.getElementById("metaPontos").textContent=meta;document.getElementById("metaBadge").textContent="🎯 META: "+meta;var prog=Math.min(100,Math.round((ult.pontos/meta)*100));document.getElementById("evolutionFill").style.width=prog+"%";document.getElementById("evolutionText").textContent="Faltam "+(meta-ult.pontos)+" pontos ("+prog+"%)";}
-function atualizarRanking(){var div=document.getElementById("rankingLista");if(historico.length===0){div.innerHTML="<p>Nenhum treino</p>";return;}var ranking=historico.slice().sort(function(a,b){return b.pontos-a.pontos;}).slice(0,5),medalhas=["🥇","🥈","🥉","4️⃣","5️⃣"],html="";for(var i=0;i<ranking.length;i++){var t=ranking[i];html+='<div class="ranking-item" style="'+(i===0?'background:linear-gradient(135deg,#3e2723,#4e342e);border:1px solid #ffd740;':'')+'"><span class="ranking-medalha">'+medalhas[i]+'</span><div style="flex:1;margin-left:10px;"><div style="font-weight:600;">'+(t.emoji||'')+' '+t.tipo+'</div><div style="font-size:11px;">'+new Date(t.data).toLocaleDateString('pt-BR')+' | '+t.dist+' km | ⏱️ '+(t.duracao||'')+'</div></div><div style="text-align:right;"><span style="font-weight:800;font-size:16px;">'+t.pontos+'</span><br><small>⭐'+(t.nota||notaTreino(t.pontos))+'</small></div></div>';}div.innerHTML=html;}
-function atualizarGraficos(){var km=[0,0,0,0,0,0,0];for(var i=0;i<historico.length;i++)km[new Date(historico[i].data).getDay()]+=historico[i].dist||0;var ctx=document.getElementById("graficoKmSemanal");if(ctx){if(graficos.km)graficos.km.destroy();graficos.km=new Chart(ctx,{type:'bar',data:{labels:["DOM","SEG","TER","QUA","QUI","SEX","SÁB"],datasets:[{data:km,backgroundColor:'#00e676',borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}}}});}var pts=[0,0,0,0,0,0,0];for(var i=0;i<historico.length;i++)pts[new Date(historico[i].data).getDay()]+=historico[i].pontos||0;var ctx2=document.getElementById("graficoPontosSemanal");if(ctx2){if(graficos.pts)graficos.pts.destroy();graficos.pts=new Chart(ctx2,{type:'line',data:{labels:["DOM","SEG","TER","QUA","QUI","SEX","SÁB"],datasets:[{data:pts,borderColor:'#ffd740',backgroundColor:'rgba(255,215,0,0.1)',borderWidth:3,tension:0.4,fill:true}]},options:{responsive:true,plugins:{legend:{display:false}}}});}var hoje=new Date(),dias7=[];for(var i=6;i>=0;i--){var d=new Date(hoje);d.setDate(hoje.getDate()-i);dias7.push(d);}var labels7=dias7.map(function(d){return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}),dados7=dias7.map(function(d){return historico.filter(function(t){return keyData(t.data)===keyData(d);}).reduce(function(s,t){return s+(t.pontos||0);},0);}),ctx3=document.getElementById("graficoRolling");if(ctx3){if(graficos.rolling)graficos.rolling.destroy();graficos.rolling=new Chart(ctx3,{type:'line',data:{labels:labels7,datasets:[{data:dados7,borderColor:'#b388ff',backgroundColor:'rgba(179,136,255,0.1)',borderWidth:3,tension:0.4,fill:true,pointRadius:6,pointBackgroundColor:'#b388ff'}]},options:{responsive:true,plugins:{legend:{display:false}}}});}}
-function atualizarComparacaoMes(){var card=document.getElementById("cardComparacaoMes"),agora=new Date(),em=agora.getMonth(),mp=em===0?11:em-1,ae=agora.getFullYear(),ap=em===0?ae-1:ae,pe=0,pp=0;for(var i=0;i<historico.length;i++){var d=new Date(historico[i].data);if(d.getMonth()===em&&d.getFullYear()===ae)pe+=historico[i].pontos||0;if(d.getMonth()===mp&&d.getFullYear()===ap)pp+=historico[i].pontos||0;}if(pe===0&&pp===0){card.style.display="none";return;}card.style.display="block";var ctx=document.getElementById("graficoComparacaoMes");if(ctx){if(graficos.comp)graficos.comp.destroy();var nomes=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];graficos.comp=new Chart(ctx,{type:'bar',data:{labels:[nomes[mp],nomes[em]],datasets:[{data:[pp,pe],backgroundColor:['#448aff','#00e676'],borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false}}}});}}
-function atualizarResumo(){var tp=0,tk=0;for(var i=0;i<historico.length;i++){tp+=historico[i].pontos||0;tk+=historico[i].dist||0;}document.getElementById("totalPontos").textContent=Math.round(tp);document.getElementById("totalKmResumo").textContent=tk.toFixed(1)+" km";}
-function renderAjustes(){var chips=document.querySelectorAll("#metaSemanalSelector .meta-chip"),vals=[2,3,4,5,6,7];if(chips.length===0){var sel=document.getElementById("metaSemanalSelector"),h="";for(var i=0;i<vals.length;i++)h+='<div class="meta-chip'+(vals[i]===metaSemanal?' selecionado':'')+'" onclick="setMetaSemanal('+vals[i]+')">'+vals[i]+'x</div>';sel.innerHTML=h;}else{for(var i=0;i<chips.length;i++){if(vals[i]===metaSemanal)chips[i].classList.add("selecionado");else chips[i].classList.remove("selecionado");}}renderBadges(new Date().getMonth(),new Date().getFullYear());}
-
-function init(){
-    var atualizou=false;
-    for(var i=0;i<historico.length;i++){var t=historico[i];if(!t.id){t.id=Date.now()+Math.random();atualizou=true;}if(t.pontos===undefined){t.pontos=calcularPontos(t.blocos,t.dist);var a=analisarTreino(t.pontos);t.classe=a.classe;t.tipo=a.texto;t.emoji=a.emoji;t.nota=Number(notaTreino(t.pontos));t.nivel=a.nivel||null;atualizou=true;}if(t.recorde===undefined)t.recorde=false;if(t.retroativo===undefined)t.retroativo=false;if(!t.duracao)t.duracao=getDuracaoTotal(t.blocos).texto;if(!t.feedback)t.feedback=gerarFeedbackInteligente({blocos:t.blocos,dist:t.dist,pontos:t.pontos,id:t.id||Date.now()});}
-    if(atualizou)localStorage.setItem("historico",JSON.stringify(historico));
-    renderBlocos();atualizarContadorTreinos();atualizarTempoTotal();renderSemana();renderCalendario();atualizarLembrete();atualizarPerfilUI();
-    document.querySelector(".nav-btn").classList.add("active-nav");setMetaSemanal(metaSemanal);
-    // Primeiro acesso - abrir modal de perfil
-    if(primeiroAcesso||!perfil.nome){setTimeout(function(){abrirModalPerfil();},500);}
+function limparDataRetroativa() {
+    dataRetroativa = null;
+    editandoId = null;
+    document.getElementById("dataRetroativaInfo").style.display = 'none';
+    document.getElementById("modoEdicaoInfo").style.display = 'none';
+    let btn = document.querySelector('.btn-primary');
+    btn.textContent = '✅ Salvar Treino';
+    btn.style.background = 'linear-gradient(135deg,#00e676 0%,#00c853 100%)';
+    btn.style.color = '#000';
 }
+
+function entrarModoEdicao(treino) {
+    editandoId = treino.id;
+    dataRetroativa = null;
+    document.getElementById("dataRetroativaInfo").style.display = 'none';
+    document.getElementById("modoEdicaoInfo").style.display = 'block';
+    let btn = document.querySelector('.btn-primary');
+    btn.textContent = '✏️ Atualizar Treino';
+    btn.style.background = 'linear-gradient(135deg,#448aff,#0059c1)';
+    btn.style.color = '#fff';
+    treinoAtual = JSON.parse(JSON.stringify(treino.blocos));
+    document.getElementById("distanciaManual").value = treino.dist || '';
+    if (treino.horaInicio) document.getElementById("horaInicio").value = treino.horaInicio;
+    if (treino.horaFim) document.getElementById("horaFim").value = treino.horaFim;
+    if (!horarioVisivel && (treino.horaInicio || treino.horaFim)) toggleHorario();
+    renderBlocos();
+    atualizarContadorTreinos();
+    atualizarTempoTotal();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleHorario() {
+    horarioVisivel = !horarioVisivel;
+    document.getElementById("horarioFields").style.display = horarioVisivel ? "block" : "none";
+    document.getElementById("horarioToggleIcon").textContent = horarioVisivel ? "▼" : "▶";
+}
+
+function atualizarTempoTotal() {
+    let dur = getDuracaoTotal(treinoAtual);
+    document.getElementById("tempoTotalDisplay").innerHTML = "⏱️ " + dur.texto;
+}
+
+function atualizarContadorTreinos() {
+    let q = treinoAtual.length;
+    document.getElementById("contadorTreinos").innerText = q + " treino" + (q !== 1 ? 's' : '');
+}
+
+function novoTreinoComAnimacao() {
+    treinoAtual.push({ vel: "", inc: "", tempo: "00:00" });
+    renderBlocos();
+    atualizarContadorTreinos();
+    atualizarTempoTotal();
+}
+
+function renderBlocos() {
+    let html = `<div class="row" style="margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+        <div class="label">VEL (km/h)</div><div class="label">INC (%)</div><div class="label">DURAÇÃO</div><div></div></div>`;
+    for (let i = 0; i < treinoAtual.length; i++) {
+        let t = treinoAtual[i];
+        html += `<div class="row">
+            <input type="number" value="${t.vel}" placeholder="0" step="0.1" onchange="treinoAtual[${i}].vel=this.value;atualizarTempoTotal()">
+            <input type="number" value="${t.inc}" placeholder="0" step="0.5" onchange="treinoAtual[${i}].inc=this.value;atualizarTempoTotal()">
+            <input class="time-input" value="${t.tempo}" inputmode="numeric" pattern="[0-9]*" onfocus="this.select()" oninput="mascaraTempo(this,${i})" onblur="formatarTempo(this,${i})">
+            <button class="btn-icon" onclick="removerTreino(${i})">✕</button></div>`;
+    }
+    document.getElementById("blocos").innerHTML = html;
+    atualizarTempoTotal();
+}
+
+function removerTreino(i) {
+    treinoAtual.splice(i, 1);
+    renderBlocos();
+    atualizarContadorTreinos();
+    atualizarTempoTotal();
+}
+
+function mascaraTempo(el, i) {
+    let v = el.value.replace(/\D/g, '');
+    if (v.length > 4) v = v.slice(0, 4);
+    el.value = v.length <= 2 ? v : v.slice(0, v.length-2) + ':' + v.slice(v.length-2);
+    treinoAtual[i].tempo = el.value;
+    atualizarTempoTotal();
+}
+
+function formatarTempo(el, i) {
+    let v = el.value.replace(/\D/g, '');
+    if (!v) { el.value = "00:00"; treinoAtual[i].tempo = "00:00"; atualizarTempoTotal(); return; }
+    v = v.padStart(4, '0');
+    let mm = v.slice(0,2), ss = v.slice(2);
+    if (Number(ss) > 59) ss = "59";
+    if (Number(mm) > 99) mm = "99";
+    el.value = mm + ":" + ss;
+    treinoAtual[i].tempo = el.value;
+    atualizarTempoTotal();
+}
+
+// ============== MODAL GENÉRICO ==============
+function abrirModal(t, m, c, ct) {
+    document.getElementById("modalTitle").textContent = t;
+    document.getElementById("modalMessage").textContent = m;
+    document.getElementById("modalConfirmBtn").textContent = ct || "Confirmar";
+    document.getElementById("modalOverlay").style.display = "flex";
+    modalCallback = c;
+}
+function fecharModal() { document.getElementById("modalOverlay").style.display = "none"; modalCallback = null; }
+document.getElementById("modalConfirmBtn").onclick = function() { if (modalCallback) modalCallback(); fecharModal(); };
+document.getElementById("modalOverlay").addEventListener("click", function(e) { if (e.target === this) fecharModal(); });
+
+// ============== SALVAR / EDITAR ==============
+function salvarTreinoComFeedback() {
+    if (treinoAtual.length === 0) { mostrarFeedbackTemporario("⚠️ Adicione pelo menos um treino!", "vermelho"); return; }
+    let dist = Number(document.getElementById("distanciaManual").value) || 0;
+    let pontos = calcularPontos(treinoAtual, dist), analise = analisarTreino(pontos), nota = notaTreino(pontos);
+    let h1 = document.getElementById("horaInicio").value || null;
+    let h2 = document.getElementById("horaFim").value || null;
+
+    let dataTreinoChave = dataRetroativa || chaveData(new Date());
+
+    let [y, m] = dataTreinoChave.split('-').map(Number);
+    let mesIdx = m - 1;
+    let melhorDoMes = obterMelhorDoMes(mesIdx, y);
+    let recordeBatido = (!melhorDoMes || pontos > melhorDoMes.pontos);
+
+    let dur = getDuracaoTotal(treinoAtual);
+    let horarioTexto = "";
+    if (h1 && h2) horarioTexto = `<div class="horario-salvo">🕐 ${h1} → ${h2}</div>`;
+    else if (h1) horarioTexto = `<div class="horario-salvo">🕐 Início: ${h1}</div>`;
+
+    let feedbackSalvo = gerarFeedbackInteligente({ blocos: treinoAtual, dist, pontos, id: editandoId || Date.now() });
+
+    let treinoObj = {
+        id: editandoId || Date.now(),
+        data: dataTreinoChave,
+        dist, blocos: JSON.parse(JSON.stringify(treinoAtual)),
+        pontos, classe: analise.classe, tipo: analise.texto, emoji: analise.emoji,
+        nota: Number(nota), recorde: recordeBatido,
+        horaInicio: h1, horaFim: h2,
+        nivel: analise.nivel || null,
+        retroativo: !!dataRetroativa,
+        duracao: dur.texto,
+        feedback: feedbackSalvo
+    };
+
+    if (editandoId) {
+        let idx = historico.findIndex(t => t.id === editandoId);
+        if (idx !== -1) {
+            treinoObj.id = editandoId;
+            treinoObj.data = historico[idx].data;
+            historico[idx] = treinoObj;
+        }
+    } else {
+        historico.push(treinoObj);
+    }
+
+    localStorage.setItem("historico", JSON.stringify(historico));
+    atualizarIndice();
+
+    let comp = obterComparacao(treinoObj);
+    let msg = `<div class="pontos-surpresa"><div class="pontos-valor">${pontos}</div><div class="pontos-label">PONTOS</div>
+        <div style="font-size:18px;">${analise.emoji} ${analise.texto}</div><div>⭐ ${nota}/10</div>
+        <div class="tempo-salvo">⏱️ ${dur.texto}</div>${horarioTexto}${dataRetroativa ? '<div style="color:var(--orange);">📅 Retroativo</div>' : ''}
+        ${editandoId ? '<div style="color:var(--blue);">✏️ Treino atualizado</div>' : ''}
+        <div>${comp}</div>${recordeBatido ? '<div>🏆 RECORDE DO MÊS!</div>' : ''}</div>`;
+    mostrarFeedbackTemporario(msg, analise.classe);
+    if (recordeBatido) criarParticulas();
+
+    document.getElementById("feedbackInteligente").innerHTML = feedbackSalvo;
+    document.getElementById("feedbackInteligente").style.display = "block";
+
+    treinoAtual = [];
+    renderBlocos();
+    atualizarContadorTreinos();
+    atualizarTempoTotal();
+    document.getElementById("distanciaManual").value = "";
+    document.getElementById("horaInicio").value = "";
+    document.getElementById("horaFim").value = "";
+    if (horarioVisivel) toggleHorario();
+    limparDataRetroativa();
+    editandoId = null;
+
+    renderSemana();
+    renderCalendario();
+    atualizarLembrete();
+}
+
+function obterMelhorDoMes(m, a) {
+    let melhor = null;
+    for (let t of historico) {
+        let [y, month] = t.data.split('-').map(Number);
+        if ((month - 1) === m && y === a) {
+            if (!melhor || t.pontos > melhor.pontos) melhor = t;
+        }
+    }
+    return melhor;
+}
+
+function obterComparacao(n) {
+    let ant = historico.filter(t => t.id !== n.id);
+    if (ant.length === 0) return "🎯 Primeiro!";
+    ant.sort((a, b) => chaveData(b.data).localeCompare(chaveData(a.data)));
+    let u = ant[0];
+    let diff = n.pontos - u.pontos;
+    let pct = u.pontos > 0 ? Math.round((diff / u.pontos) * 100) : 0;
+    if (diff > 10) return `<span class="comparacao-badge comparacao-up">🚀 +${pct}%</span>`;
+    if (diff > 0) return `<span class="comparacao-badge comparacao-up">📈 +${pct}%</span>`;
+    if (diff === 0) return '<span class="comparacao-badge comparacao-same">➡️ Igual</span>';
+    return `<span class="comparacao-badge comparacao-down">📉 ${pct}%</span>`;
+}
+
+// ============== EXCLUIR ==============
+function excluirTreino(id, ds) {
+    treinoParaExcluir = { id, dataStr: ds };
+    abrirModal("🗑️ Excluir", "Tem certeza que deseja excluir este treino?", function() {
+        historico = historico.filter(t => t.id !== treinoParaExcluir.id);
+        localStorage.setItem("historico", JSON.stringify(historico));
+        atualizarIndice();
+        renderCalendario();
+        renderSemana();
+        abrirDia(treinoParaExcluir.dataStr);
+        atualizarLembrete();
+    }, "Excluir");
+}
+
+function resetarComConfirmacao() {
+    abrirModal("⚠️ Resetar", "Apagar TODOS os dados?", function() {
+        localStorage.removeItem("historico");
+        historico = [];
+        indiceDia = {};
+        treinoAtual = [];
+        renderBlocos();
+        atualizarContadorTreinos();
+        atualizarTempoTotal();
+        renderSemana();
+        renderCalendario();
+        document.getElementById("detalheDia").innerHTML = "";
+        for (let k in graficos) { if (graficos[k]) graficos[k].destroy(); }
+        graficos = {};
+        mostrarFeedbackTemporario("✅ Resetado!", "verde");
+        atualizarLembrete();
+    }, "Resetar");
+}
+
+// ============== CALENDÁRIO & SEMANA ==============
+function verificarStatusSemana(dataSabado) {
+    let hoje = new Date();
+    if (dataSabado > hoje) return '<div class="cell-status"></div>';
+    let inicio = new Date(dataSabado);
+    inicio.setDate(dataSabado.getDate() - 6);
+    inicio.setHours(0,0,0,0);
+    let fim = new Date(dataSabado);
+    fim.setHours(23,59,59,999);
+    let c = 0;
+    for (let chave in indiceDia) {
+        let [y, mon, d] = chave.split('-').map(Number);
+        let data = new Date(y, mon-1, d);
+        if (data >= inicio && data <= fim) c += indiceDia[chave].length;
+    }
+    return `<div class="cell-status">${c >= metaSemanal ? '✅' : '❌'}</div>`;
+}
+
+function renderConquistasResumidas(mes, ano) {
+    let agora = new Date();
+    let mesAtualReal = agora.getMonth();
+    let anoAtualReal = agora.getFullYear();
+
+    // Se for mês atual ou futuro, mostra apenas progresso de km
+    if (ano > anoAtualReal || (ano === anoAtualReal && mes >= mesAtualReal)) {
+        let kmMes = getKmDoMes(mes, ano);
+        return `📏 ${kmMes.toFixed(1)} km este mês`;
+    }
+
+    // Meses passados: exibe conquistas desbloqueadas
+    let badges = getBadges(mes, ano);
+    let conquistados = badges.filter(b => b.c());
+    if (conquistados.length === 0) return "Nenhuma conquista este mês";
+
+    let html = '<div class="conquistas-resumidas">';
+    for (let b of conquistados) {
+        html += `<div class="conquista-resumida"><span class="icone">${b.icon}</span><span>${b.nome}</span></div>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderCalendario() {
+    document.getElementById("tituloMes").innerText = new Date(anoAtual, mesAtual).toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+    if (mostrandoMeses) {
+        let nomes = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+        let html = '<div class="meses-grid">';
+        for (let i = 0; i < 12; i++) html += `<div class="mes-item${i === mesAtual ? ' selecionado' : ''}" onclick="trocarMes(${i})">${nomes[i]}</div>`;
+        html += '</div>';
+        document.getElementById("mesGrid").innerHTML = html;
+        document.getElementById("conquistasDoMes").innerHTML = "";
+        return;
+    }
+
+    let primeiro = new Date(anoAtual, mesAtual, 1).getDay();
+    let diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+    let melhor = obterMelhorDoMes(mesAtual, anoAtual);
+
+    let htmlFinal = "", contadorDia = 0;
+    for (let i = 0; i < primeiro; i++) {
+        htmlFinal += "<div></div>";
+        contadorDia++;
+        if (contadorDia % 7 === 0) htmlFinal += '<div class="cell-status"></div>';
+    }
+
+    for (let d = 1; d <= diasNoMes; d++) {
+        let chave = `${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let lista = indiceDia[chave] || [];
+        let treino = lista.reduce((a, b) => a.pontos > b.pontos ? a : b, null);
+        let classeFinal = treino ? treino.classe : "";
+        let temTreino = treino ? "tem-treino" : "";
+        if (treino && melhor && treino.id === melhor.id && classeFinal !== "amarelo" && classeFinal !== "lendario" && classeFinal !== "mitico" && classeFinal !== "divino") {
+            classeFinal = "amarelo";
+        }
+        htmlFinal += `<div class="cell ${classeFinal} ${temTreino}" onclick="abrirDiaComAnimacao('${chave}')">${d}</div>`;
+        contadorDia++;
+        if (contadorDia % 7 === 0) {
+            let dataSabado = new Date(anoAtual, mesAtual, d);
+            htmlFinal += verificarStatusSemana(dataSabado);
+        }
+    }
+
+    if (contadorDia % 7 !== 0) {
+        while (contadorDia % 7 !== 0) { htmlFinal += "<div></div>"; contadorDia++; }
+        htmlFinal += '<div class="cell-status"></div>';
+    }
+
+    document.getElementById("mesGrid").innerHTML = htmlFinal;
+    document.getElementById("conquistasDoMes").innerHTML = renderConquistasResumidas(mesAtual, anoAtual);
+}
+
+function renderSemana() {
+    let hoje = new Date();
+    let dSemana = hoje.getDay();
+    let nomes = ["DOM","SEG","TER","QUA","QUI","SEX","SÁB"];
+    let html = "";
+    for (let i = 0; i < 7; i++) {
+        let data = new Date(hoje);
+        data.setDate(hoje.getDate() - dSemana + i);
+        let chave = chaveData(data);
+        let treinos = indiceDia[chave] || [];
+        let best = treinos.reduce((a, b) => a.pontos > b.pontos ? a : b, null);
+        let estilo = best ? "background:linear-gradient(135deg,#00e67620,#00c85320);border-color:#00e676;" : "";
+        let classe = (chave === hojeChave()) ? 'today' : '';
+        html += `<div class="day ${classe}" style="${estilo}" onclick="abrirDiaComAnimacao('${chave}')">${nomes[i]}<br><span style="font-size:15px;">${data.getDate()}</span></div>`;
+    }
+    document.getElementById("semanaHome").innerHTML = html;
+    document.getElementById("semanaCal").innerHTML = html;
+}
+
+function abrirDiaComAnimacao(chave) {
+    let lista = indiceDia[chave] || [];
+    let detalheDiv = document.getElementById("detalheDia");
+    let dataObj = new Date(chave + 'T00:00:00');
+    let hoje = new Date();
+    if (!lista.length) {
+        let html = `<div class="card" style="text-align:center;"><div style="font-size:44px;">📅</div>
+            <div>${dataObj.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' })}</div>
+            <div style="color:var(--text2);">Nenhum treino</div>`;
+        if (dataObj <= hoje) html += `<button class="btn-registrar" onclick="registrarTreinoEsquecido('${chave}')">📝 Registrar Treino</button>`;
+        html += "</div>";
+        detalheDiv.innerHTML = html;
+        return;
+    }
+    lista.sort((a, b) => b.pontos - a.pontos);
+    let html = "";
+    for (let t of lista) {
+        let nt = notaTreino(t.pontos);
+        let horarioInfo = "";
+        if (t.horaInicio && t.horaFim) horarioInfo = `<div style="font-size:11px;color:var(--text2);">🕐 ${t.horaInicio} → ${t.horaFim}</div>`;
+        else if (t.horaInicio) horarioInfo = `<div style="font-size:11px;color:var(--text2);">🕐 ${t.horaInicio}</div>`;
+        html += `<div class="card ${t.classe} ${t.recorde ? 'record-batido' : ''}">
+            <div style="display:flex;justify-content:space-between;">
+                <span>${t.emoji||''} ${t.tipo}</span><span>⭐ ${nt}/10</span></div>
+            <div>📅 ${t.data} | 📏 ${t.dist} km | 🎯 ${t.pontos} pts | ⏱️ ${t.duracao||''}</div>${horarioInfo}<hr>`;
+        for (let b of t.blocos) html += `🔹 Treino: ${b.vel||0} km/h | ${b.inc||0}% | ${b.tempo||'00:00'}<br>`;
+        html += `<div style="text-align:right;margin-top:10px;">
+            <button class="btn-edit" onclick="event.stopPropagation(); entrarModoEdicao(historico.find(h=>h.id===${t.id}))">✏️ Editar</button>
+            <button class="btn-delete" onclick="event.stopPropagation(); excluirTreino(${t.id},'${t.data}')">🗑️ Excluir</button></div>`;
+        if (t.feedback) html += `<div style="margin-top:10px;">${t.feedback}</div>`;
+        html += '</div>';
+    }
+    detalheDiv.innerHTML = html;
+}
+
+function registrarTreinoEsquecido(chave) {
+    setDataRetroativa(chave);
+    trocarComAnimacao('home', document.querySelector('.nav-btn'));
+    mostrarFeedbackTemporario("📅 Preencha os dados para " + chave, "azul");
+}
+
+// ============== NAVAÇÃO ==============
+function trocarComAnimacao(pag, el) {
+    ['home','cal','prog','ajustes'].forEach(p => { let div = document.getElementById(p); if (div) div.style.display = 'none'; });
+    let target = document.getElementById(pag);
+    if (target) target.style.display = 'block';
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
+    if (el) el.classList.add("active-nav");
+    if (pag === "home") {
+        limparDataRetroativa();
+        atualizarPerfilUI();
+        atualizarLembrete();
+        renderBlocos();
+        atualizarContadorTreinos();
+        atualizarTempoTotal();
+    }
+    if (pag === "prog") setTimeout(atualizarProgresso, 150);
+    if (pag === "cal") { renderCalendario(); renderSemana(); }
+    if (pag === "ajustes") renderAjustes();
+}
+
+function mudarMes(dir) {
+    mesAtual += dir;
+    if (mesAtual < 0) { mesAtual = 11; anoAtual--; }
+    if (mesAtual > 11) { mesAtual = 0; anoAtual++; }
+    renderCalendario();
+}
+function toggleMeses() { mostrandoMeses = !mostrandoMeses; renderCalendario(); }
+function trocarMes(m) { mesAtual = m; mostrandoMeses = false; renderCalendario(); }
+
+// ============== LEMBRETE ==============
+function atualizarLembrete() {
+    let hoje = new Date();
+    let inicio = new Date(hoje);
+    inicio.setDate(hoje.getDate() - hoje.getDay());
+    inicio.setHours(0,0,0,0);
+    let c = 0;
+    for (let chave in indiceDia) {
+        let [y, m, d] = chave.split('-').map(Number);
+        let data = new Date(y, m-1, d);
+        if (data >= inicio) c += indiceDia[chave].length;
+    }
+    let f = metaSemanal - c, dr = 7 - hoje.getDay();
+    let card = document.getElementById("lembreteCard");
+    if (f <= 0) {
+        card.innerHTML = `🏆 Meta batida! ${c}/${metaSemanal}`;
+        card.style.borderColor = "var(--yellow)";
+    } else if (dr <= 2 && f >= 2) {
+        card.innerHTML = `⚠️ Faltam ${f} treinos, ${dr} dia(s)!`;
+        card.style.borderColor = "var(--red)";
+    } else {
+        card.innerHTML = `💪 Faltam ${f} treino(s).`;
+        card.style.borderColor = "var(--purple)";
+    }
+    card.style.display = "block";
+}
+
+function setMetaSemanal(v) {
+    metaSemanal = v;
+    localStorage.setItem("metaSemanal", JSON.stringify(metaSemanal));
+    document.querySelectorAll("#metaSemanalSelector .meta-chip").forEach((chip, i) => {
+        let vals = [2,3,4,5,6,7];
+        if (vals[i] === v) chip.classList.add("selecionado");
+        else chip.classList.remove("selecionado");
+    });
+    document.getElementById("metaSalvaMsg").style.display = "block";
+    setTimeout(() => { document.getElementById("metaSalvaMsg").style.display = "none"; }, 2000);
+    atualizarLembrete(); renderCalendario(); renderSemana();
+}
+
+function getBadges(mes, ano) {
+    let kmMes = getKmDoMes(mes, ano);
+    let treinosMes = 0, recordMes = false, lendarioMes = false, miticoMes = false, divinoMes = false;
+    let madrugador = false, noturno = false;
+    for (let chave in indiceDia) {
+        let [y, m] = chave.split('-').map(Number);
+        if (y === ano && (m - 1) === mes) {
+            let treinos = indiceDia[chave];
+            treinosMes += treinos.length;
+            for (let t of treinos) {
+                if (t.recorde) recordMes = true;
+                if (t.pontos >= 100) lendarioMes = true;
+                if (t.pontos >= 150) miticoMes = true;
+                if (t.pontos >= 200) divinoMes = true;
+                if (t.horaInicio && t.horaInicio < "07:00") madrugador = true;
+                if (t.horaFim && t.horaFim >= "20:00") noturno = true;
+            }
+        }
+    }
+    let geralTreinos = historico.length;
+    return [
+        { id:"t1", nome:"1º do Mês", desc:"Primeiro", icon:"🥇", c:() => treinosMes >= 1 },
+        { id:"3s", nome:"3 na Semana", desc:"3 em 7 dias", icon:"🔥", c:() => {
+            let hoje = new Date(), ini = new Date(hoje); ini.setDate(hoje.getDate()-7);
+            let c = 0;
+            for (let chave in indiceDia) {
+                let [y, m, d] = chave.split('-').map(Number);
+                let data = new Date(y, m-1, d);
+                if (data >= ini) c += indiceDia[chave].length;
+            }
+            return c >= 3;
+        }},
+        { id:"5m", nome:"5 no Mês", desc:"5 treinos", icon:"⚡", c:() => treinosMes >= 5 },
+        { id:"10m", nome:"10 no Mês", desc:"10 treinos", icon:"💪", c:() => treinosMes >= 10 },
+        { id:"km25", nome:"25KM", desc:"25 km", icon:"🛣️", c:() => kmMes >= 25 },
+        { id:"km50", nome:"50KM", desc:"50 km", icon:"🏅", c:() => kmMes >= 50 },
+        { id:"rec", nome:"Recorde", desc:"Bateu", icon:"👑", c:() => recordMes },
+        { id:"mad", nome:"Madrugador", desc:"< 7h", icon:"🌅", c:() => madrugador },
+        { id:"not", nome:"Noturno", desc:"> 20h", icon:"🌙", c:() => noturno },
+        { id:"len", nome:"Lendário", desc:"100+ pts", icon:"💎", c:() => lendarioMes },
+        { id:"mit", nome:"Mítico", desc:"150+ pts", icon:"🌟", c:() => miticoMes },
+        { id:"div", nome:"Divino", desc:"200+ pts", icon:"👑", c:() => divinoMes },
+        { id:"g10", nome:"Maratonista", desc:"10 total", icon:"🏃", c:() => geralTreinos >= 10 },
+        { id:"gdist", nome:"10km+", desc:"Treino 10km+", icon:"📏", c:() => historico.some(t => t.dist >= 10) }
+    ];
+}
+
+function renderBadges(mes, ano) {
+    let grid = document.getElementById("badgeGrid");
+    if (!grid) return;
+    let badges = getBadges(mes, ano);
+    let html = "";
+    for (let b of badges) {
+        let d = b.c();
+        html += `<div class="badge-item ${d ? 'desbloqueado' : 'bloqueado'}">
+            <div class="badge-icon">${b.icon}</div><div class="badge-nome">${b.nome}</div>
+            <div class="badge-desc">${b.desc}</div>${d ? '✅' : '🔒'}</div>`;
+    }
+    grid.innerHTML = html;
+}
+
+function exportarDados() {
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "12.3" };
+    let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    a.click();
+}
+
+function importarDados() { document.getElementById("importFile").click(); }
+
+function processarImportacao(event) {
+    let file = event.target.files[0];
+    if (!file) return;
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let dados = JSON.parse(e.target.result);
+            if (!dados.historico || !Array.isArray(dados.historico)) throw new Error("Inválido");
+            abrirModal("Importar", dados.historico.length + " treinos. Substituir?", function() {
+                historico = dados.historico;
+                metaSemanal = dados.metaSemanal || 3;
+                if (dados.perfil) perfil = dados.perfil;
+                localStorage.setItem("historico", JSON.stringify(historico));
+                localStorage.setItem("metaSemanal", JSON.stringify(metaSemanal));
+                localStorage.setItem("perfil", JSON.stringify(perfil));
+                atualizarIndice();
+                renderCalendario(); renderSemana(); renderAjustes();
+                atualizarLembrete(); atualizarPerfilUI();
+            }, "Importar");
+        } catch (err) {
+            mostrarFeedbackTemporario("❌ Arquivo inválido", "vermelho");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+}
+
+function atualizarProgresso() {
+    atualizarEvolucao(); atualizarRanking(); atualizarGraficos(); atualizarResumo(); atualizarComparacaoMes();
+}
+function atualizarEvolucao() {
+    let card = document.getElementById("cardEvolucao");
+    if (historico.length < 2) { card.style.display = "none"; return; }
+    card.style.display = "block";
+    let ord = historico.slice().sort((a, b) => chaveData(a.data).localeCompare(chaveData(b.data)));
+    let ult = ord[ord.length - 1];
+    let meta = Math.round((ult.pontos * 1.1 + 5) / 2);
+    if (meta <= ult.pontos) meta = Math.round(ult.pontos * 1.15);
+    document.getElementById("metaPontos").textContent = meta;
+    document.getElementById("metaBadge").textContent = "🎯 META: " + meta;
+    let prog = Math.min(100, Math.round((ult.pontos / meta) * 100));
+    document.getElementById("evolutionFill").style.width = prog + "%";
+    document.getElementById("evolutionText").textContent = "Faltam " + (meta - ult.pontos) + " pontos (" + prog + "%)";
+}
+
+function atualizarRanking() {
+    let div = document.getElementById("rankingLista");
+    if (historico.length === 0) { div.innerHTML = "<p>Nenhum treino</p>"; return; }
+    let ranking = historico.slice().sort((a, b) => b.pontos - a.pontos).slice(0, 5);
+    let medalhas = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+    let html = "";
+    ranking.forEach((t, i) => {
+        html += `<div class="ranking-item" style="${i === 0 ? 'background:linear-gradient(135deg,#3e2723,#4e342e);border:1px solid #ffd740;' : ''}">
+            <span class="ranking-medalha">${medalhas[i]}</span>
+            <div style="flex:1;margin-left:10px;"><div style="font-weight:600;">${t.emoji||''} ${t.tipo}</div>
+            <div style="font-size:11px;">${t.data} | ${t.dist} km | ⏱️ ${t.duracao||''}</div></div>
+            <div style="text-align:right;"><span style="font-weight:800;font-size:16px;">${t.pontos}</span><br><small>⭐${t.nota||notaTreino(t.pontos)}</small></div></div>`;
+    });
+    div.innerHTML = html;
+}
+
+function atualizarGraficos() {
+    let km = [0,0,0,0,0,0,0];
+    for (let t of historico) {
+        let [y, m, d] = t.data.split('-').map(Number);
+        km[new Date(y, m-1, d).getDay()] += Number(t.dist) || 0;
+    }
+    let ctx = document.getElementById("graficoKmSemanal");
+    if (ctx) {
+        if (graficos.km) graficos.km.destroy();
+        graficos.km = new Chart(ctx, { type:'bar', data:{ labels:["DOM","SEG","TER","QUA","QUI","SEX","SÁB"], datasets:[{ data:km, backgroundColor:'#00e676', borderRadius:8 }] }, options:{ responsive:true, plugins:{ legend:{ display:false } } } });
+    }
+
+    let pts = [0,0,0,0,0,0,0];
+    for (let t of historico) {
+        let [y, m, d] = t.data.split('-').map(Number);
+        pts[new Date(y, m-1, d).getDay()] += t.pontos || 0;
+    }
+    let ctx2 = document.getElementById("graficoPontosSemanal");
+    if (ctx2) {
+        if (graficos.pts) graficos.pts.destroy();
+        graficos.pts = new Chart(ctx2, { type:'line', data:{ labels:["DOM","SEG","TER","QUA","QUI","SEX","SÁB"], datasets:[{ data:pts, borderColor:'#ffd740', backgroundColor:'rgba(255,215,0,0.1)', borderWidth:3, tension:0.4, fill:true }] }, options:{ responsive:true, plugins:{ legend:{ display:false } } } });
+    }
+
+    let hoje = new Date(), dias7 = [];
+    for (let i = 6; i >= 0; i--) {
+        let d = new Date(hoje);
+        d.setDate(hoje.getDate() - i);
+        dias7.push(chaveData(d));
+    }
+    let labels7 = dias7.map(d => d.slice(5));
+    let dados7 = dias7.map(d => {
+        let treinos = indiceDia[d] || [];
+        return treinos.reduce((s, t) => s + (t.pontos || 0), 0);
+    });
+    let ctx3 = document.getElementById("graficoRolling");
+    if (ctx3) {
+        if (graficos.rolling) graficos.rolling.destroy();
+        graficos.rolling = new Chart(ctx3, { type:'line', data:{ labels:labels7, datasets:[{ data:dados7, borderColor:'#b388ff', backgroundColor:'rgba(179,136,255,0.1)', borderWidth:3, tension:0.4, fill:true, pointRadius:6, pointBackgroundColor:'#b388ff' }] }, options:{ responsive:true, plugins:{ legend:{ display:false } } } });
+    }
+}
+
+function atualizarComparacaoMes() {
+    let card = document.getElementById("cardComparacaoMes");
+    let agora = new Date();
+    let em = agora.getMonth(), mp = em === 0 ? 11 : em - 1;
+    let ae = agora.getFullYear(), ap = em === 0 ? ae - 1 : ae;
+    let pe = 0, pp = 0;
+    for (let t of historico) {
+        let [y, m] = t.data.split('-').map(Number);
+        if ((m-1) === em && y === ae) pe += t.pontos || 0;
+        if ((m-1) === mp && y === ap) pp += t.pontos || 0;
+    }
+    if (pe === 0 && pp === 0) { card.style.display = "none"; return; }
+    card.style.display = "block";
+    let ctx = document.getElementById("graficoComparacaoMes");
+    if (ctx) {
+        if (graficos.comp) graficos.comp.destroy();
+        let nomes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        graficos.comp = new Chart(ctx, { type:'bar', data:{ labels:[nomes[mp], nomes[em]], datasets:[{ data:[pp, pe], backgroundColor:['#448aff','#00e676'], borderRadius:8 }] }, options:{ responsive:true, plugins:{ legend:{ display:false } } } });
+    }
+}
+
+function atualizarResumo() {
+    let tp = 0, tk = 0;
+    for (let t of historico) { tp += t.pontos || 0; tk += Number(t.dist) || 0; }
+    document.getElementById("totalPontos").textContent = Math.round(tp);
+    document.getElementById("totalKmResumo").textContent = tk.toFixed(1) + " km";
+}
+
+function renderAjustes() {
+    let sel = document.getElementById("metaSemanalSelector");
+    sel.innerHTML = [2,3,4,5,6,7].map(v => `<div class="meta-chip${v === metaSemanal ? ' selecionado' : ''}" onclick="setMetaSemanal(${v})">${v}x</div>`).join('');
+    renderBadges(new Date().getMonth(), new Date().getFullYear());
+}
+
+// ============== INICIALIZAÇÃO ==============
+function init() {
+    try {
+        historico = JSON.parse(localStorage.getItem("historico")) || [];
+        metaSemanal = JSON.parse(localStorage.getItem("metaSemanal")) || 3;
+        perfil = JSON.parse(localStorage.getItem("perfil")) || perfil;
+        avatarSelecionado = perfil.avatar || "grad1";
+        if (!perfil.nome) primeiroAcesso = true;
+    } catch (e) { primeiroAcesso = true; }
+
+    let atualizou = false;
+    for (let t of historico) {
+        if (!t.id) { t.id = Date.now() + Math.random(); atualizou = true; }
+        if (typeof t.data === 'string' && t.data.includes('T')) { t.data = chaveData(t.data); atualizou = true; }
+        else if (!t.data || !/^\d{4}-\d{2}-\d{2}$/.test(t.data)) { t.data = chaveData(new Date()); atualizou = true; }
+        if (t.pontos === undefined) {
+            t.pontos = calcularPontos(t.blocos, t.dist);
+            let a = analisarTreino(t.pontos);
+            t.classe = a.classe; t.tipo = a.texto; t.emoji = a.emoji;
+            t.nota = Number(notaTreino(t.pontos)); t.nivel = a.nivel || null;
+            atualizou = true;
+        }
+        if (t.recorde === undefined) t.recorde = false;
+        if (t.retroativo === undefined) t.retroativo = false;
+        if (!t.duracao) t.duracao = getDuracaoTotal(t.blocos).texto;
+        if (!t.feedback) t.feedback = gerarFeedbackInteligente({ blocos:t.blocos, dist:t.dist, pontos:t.pontos, id:t.id });
+    }
+    if (atualizou) localStorage.setItem("historico", JSON.stringify(historico));
+
+    atualizarIndice();
+    renderBlocos(); atualizarContadorTreinos(); atualizarTempoTotal();
+    renderSemana(); renderCalendario(); atualizarLembrete(); atualizarPerfilUI();
+    setMetaSemanal(metaSemanal);
+
+    if (primeiroAcesso || !perfil.nome) setTimeout(() => abrirModalPerfil(), 500);
+}
+
+window.novoTreinoComAnimacao = novoTreinoComAnimacao;
+window.removerTreino = removerTreino;
+window.mascaraTempo = mascaraTempo;
+window.formatarTempo = formatarTempo;
+window.salvarTreinoComFeedback = salvarTreinoComFeedback;
+window.toggleHorario = toggleHorario;
+window.abrirModalPerfil = abrirModalPerfil;
+window.selecionarAvatar = selecionarAvatar;
+window.pularPerfil = pularPerfil;
+window.salvarPerfil = salvarPerfil;
+window.trocarComAnimacao = trocarComAnimacao;
+window.mudarMes = mudarMes;
+window.toggleMeses = toggleMeses;
+window.trocarMes = trocarMes;
+window.setMetaSemanal = setMetaSemanal;
+window.exportarDados = exportarDados;
+window.importarDados = importarDados;
+window.processarImportacao = processarImportacao;
+window.resetarComConfirmacao = resetarComConfirmacao;
+window.excluirTreino = excluirTreino;
+window.abrirDiaComAnimacao = abrirDiaComAnimacao;
+window.registrarTreinoEsquecido = registrarTreinoEsquecido;
+window.entrarModoEdicao = entrarModoEdicao;
+window.limparDataRetroativa = limparDataRetroativa;
+window.setDataRetroativa = setDataRetroativa;
+window.atualizarTempoTotal = atualizarTempoTotal;
+window.renderBlocos = renderBlocos;
+window.atualizarContadorTreinos = atualizarContadorTreinos;
+window.treinoAtual = treinoAtual;
+window.historico = historico;
+window.indiceDia = indiceDia;
+
 init();
+})();
 </script>
 </body>
 </html>

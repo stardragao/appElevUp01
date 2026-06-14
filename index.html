@@ -481,7 +481,7 @@ function getVelocidadeMaximaPessoal() {
     return max;
 }
 
-// ============== CALORIAS (ACSM) ==============
+// ============== CALORIAS (ACSM) CORRIGIDA ==============
 function calcularCalorias(blocos, pesoUsuario) {
     let peso = Number(pesoUsuario);
     if (!peso || peso <= 0) return 0;
@@ -489,17 +489,30 @@ function calcularCalorias(blocos, pesoUsuario) {
     for (let b of blocos) {
         let vel = Number(b.vel) || 0;
         let inc = Number(b.inc) || 0;
-        let sp = String(b.tempo || "00:00").split(":");
-        let minutos = (Number(sp[0]) || 0) + (Number(sp[1]) || 0) / 60;
+        let tempoStr = String(b.tempo || "00:00");
+        
+        // Leitura robusta do tempo (aceita "30:00" ou "30")
+        let sp = tempoStr.split(":");
+        let minutos;
+        if (sp.length >= 2) {
+            minutos = Number(sp[0]) + (Number(sp[1]) / 60);
+        } else {
+            // Se não tem dois pontos, interpreta como minutos puros
+            minutos = Number(sp[0]) || 0;
+        }
+
         if (minutos <= 0 || vel <= 0) continue;
-        let vel_m_min = vel * 16.666;
+
+        let vel_m_min = vel * 16.6667;
         let inc_frac = inc / 100;
         let vo2;
+
         if (vel < 7) {
             vo2 = (0.1 * vel_m_min) + (1.8 * vel_m_min * inc_frac) + 3.5;
         } else {
             vo2 = (0.2 * vel_m_min) + (0.9 * vel_m_min * inc_frac) + 3.5;
         }
+
         let kcalMin = (vo2 * peso) / 200;
         totalKcal += kcalMin * minutos;
     }
@@ -773,19 +786,46 @@ function removerTreino(i) {
     atualizarTempoTotal();
 }
 
+// ============== MÁSCARA DE TEMPO CORRIGIDA ==============
 function mascaraTempo(el, i) {
     let v = el.value.replace(/\D/g, '');
     if (v.length > 4) v = v.slice(0, 4);
-    el.value = v.length <= 2 ? v : v.slice(0, v.length-2) + ':' + v.slice(v.length-2);
+    // Insere ":" automaticamente ao digitar o terceiro dígito (ex.: 30 -> 03:00? Melhor manter simples)
+    if (v.length > 2) {
+        el.value = v.slice(0, v.length-2) + ':' + v.slice(v.length-2);
+    } else {
+        el.value = v;
+    }
     treinoAtual[i].tempo = el.value;
     atualizarTempoTotal();
 }
 
 function formatarTempo(el, i) {
-    let v = el.value.replace(/\D/g, '');
-    if (!v) { el.value = "00:00"; treinoAtual[i].tempo = "00:00"; atualizarTempoTotal(); return; }
-    v = v.padStart(4, '0');
-    let mm = v.slice(0,2), ss = v.slice(2);
+    let raw = el.value.replace(/\D/g, '');
+    if (!raw) {
+        el.value = "00:00";
+        treinoAtual[i].tempo = "00:00";
+        atualizarTempoTotal();
+        return;
+    }
+
+    // Se não tem dois pontos, trata como minutos puros
+    if (!el.value.includes(':')) {
+        let minutos = parseInt(raw, 10) || 0;
+        if (minutos > 999) minutos = 999;
+        let mm = String(minutos).padStart(2, '0');
+        el.value = mm + ":00";
+        treinoAtual[i].tempo = el.value;
+        atualizarTempoTotal();
+        return;
+    }
+
+    // Se já tem o formato MM:SS, garante padronização
+    let sp = raw.split(':') || [];
+    let mm = sp[0] || '00';
+    let ss = sp[1] || '00';
+    mm = mm.padStart(2, '0');
+    ss = ss.padStart(2, '0');
     if (Number(ss) > 59) ss = "59";
     if (Number(mm) > 99) mm = "99";
     el.value = mm + ":" + ss;
@@ -1016,7 +1056,6 @@ function renderCalendario() {
     for (let d = 1; d <= diasNoMes; d++) {
         let chave = `${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         let lista = indiceDia[chave] || [];
-        // CORREÇÃO: verificar se lista tem elementos antes do reduce
         let treino = lista.length > 0 ? lista.reduce((a, b) => a.pontos > b.pontos ? a : b) : null;
         let classeFinal = treino ? treino.classe : "";
         let temTreino = treino ? "tem-treino" : "";
@@ -1052,7 +1091,6 @@ function renderSemana() {
         data.setDate(hoje.getDate() - dSemana + i);
         let chave = chaveData(data);
         let treinos = indiceDia[chave] || [];
-        // CORREÇÃO: verificar se treinos tem elementos antes do reduce
         let best = treinos.length > 0 ? treinos.reduce((a, b) => a.pontos > b.pontos ? a : b) : null;
         let estilo = best ? "background:linear-gradient(135deg,#00e67620,#00c85320);border-color:#00e676;" : "";
         let classe = (chave === hojeChave()) ? 'today' : '';
@@ -1068,7 +1106,6 @@ function abrirDiaComAnimacao(chave) {
     let lista = indiceDia[chave] || [];
     let detalheDiv = document.getElementById("detalheDia");
     if (!detalheDiv) return;
-    // CORREÇÃO: criar data de forma segura
     let [anoStr, mesStr, diaStr] = chave.split('-');
     let dataObj = new Date(Number(anoStr), Number(mesStr) - 1, Number(diaStr));
     let hoje = new Date();
@@ -1249,7 +1286,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.3" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "14.0" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

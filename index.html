@@ -134,6 +134,7 @@
         .conquistas-resumidas { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; margin-top:10px; }
         .conquista-resumida { display:flex; flex-direction:column; align-items:center; font-size:12px; }
         .conquista-resumida .icone { font-size:24px; }
+        .calorias-badge { background:rgba(255,145,0,0.2); color:var(--orange); border:1px solid var(--orange); border-radius:20px; padding:4px 12px; font-size:13px; display:inline-block; margin-top:5px; }
     </style>
 </head>
 <body>
@@ -256,6 +257,8 @@ let avatarSelecionado = "grad1", primeiroAcesso = false;
 let indiceDia = {};
 
 // ============== UTILITÁRIOS ==============
+const sortear = (array) => array[Math.floor(Math.random() * array.length)];
+
 function chaveData(d) {
     if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     let date = d ? new Date(d) : new Date();
@@ -471,7 +474,32 @@ function getVelocidadeMaximaPessoal() {
     return max;
 }
 
-// ============== FEEDBACK INTELIGENTE (MELHORADO) ==============
+// ============== CALORIAS (ACSM) ==============
+function calcularCalorias(blocos, pesoUsuario) {
+    let peso = Number(pesoUsuario);
+    if (!peso || peso <= 0) return 0;
+    let totalKcal = 0;
+    for (let b of blocos) {
+        let vel = Number(b.vel) || 0;
+        let inc = Number(b.inc) || 0;
+        let sp = String(b.tempo || "00:00").split(":");
+        let minutos = (Number(sp[0]) || 0) + (Number(sp[1]) || 0) / 60;
+        if (minutos <= 0 || vel <= 0) continue;
+        let vel_m_min = vel * 16.666;
+        let inc_frac = inc / 100;
+        let vo2;
+        if (vel < 7) {
+            vo2 = (0.1 * vel_m_min) + (1.8 * vel_m_min * inc_frac) + 3.5;
+        } else {
+            vo2 = (0.2 * vel_m_min) + (0.9 * vel_m_min * inc_frac) + 3.5;
+        }
+        let kcalMin = (vo2 * peso) / 200;
+        totalKcal += kcalMin * minutos;
+    }
+    return Math.round(totalKcal);
+}
+
+// ============== FEEDBACK INTELIGENTE (HUMANIZADO) ==============
 function gerarFeedbackInteligente(treino) {
     let blocos = treino.blocos, dist = treino.dist, duracaoMin = 0;
     for (let b of blocos) {
@@ -483,39 +511,69 @@ function gerarFeedbackInteligente(treino) {
     let incMedia = blocos.reduce((s, b) => s + (Number(b.inc)||0), 0) / blocos.length;
     let maiorVel = Math.max(...blocos.map(b => Number(b.vel)||0));
     let dur = getDuracaoTotal(blocos);
-    let idade = getIdade(), peso = Number(perfil.peso) || 0, altura = Number(perfil.altura) || 0;
-    let genero = perfil.genero;
-    let imc = getIMC();
+    let idade = getIdade(), peso = Number(perfil.peso) || 0;
+    let genero = perfil.genero, imc = getIMC();
     let velMaxPessoal = getVelocidadeMaximaPessoal();
     if (velMaxPessoal === 0) velMaxPessoal = maiorVel;
+
+    let calorias = treino.calorias || calcularCalorias(blocos, perfil.peso);
 
     let estrutura = [];
     let primeiraVel = Number(blocos[0].vel) || 0;
     let ultimaVel = Number(blocos[blocos.length-1].vel) || 0;
     let teveAquecimento = blocos.length >= 2 && primeiraVel < velMedia && (primeiraVel < maiorVel * 0.7);
     let teveDesaquecimento = blocos.length >= 2 && ultimaVel < velMedia && (ultimaVel < maiorVel * 0.7);
-    if (teveAquecimento) estrutura.push("🟢 Começou mais leve, bom aquecimento!");
-    else if (blocos.length >= 2 && primeiraVel >= velMedia) estrutura.push("⚠️ Já começou em ritmo forte. Considere um aquecimento leve.");
-    if (teveDesaquecimento) estrutura.push("🔵 Terminou reduzindo, ótimo desaquecimento.");
-    else if (blocos.length >= 2 && ultimaVel >= velMedia && duracaoMin > 20) estrutura.push("⚠️ Terminou em ritmo alto. Tente reduzir nos últimos minutos.");
-    if (maiorVel > velMedia * 1.3) estrutura.push("🔺 Picos de velocidade detectados!");
-    if (estrutura.length === 0) estrutura.push("➡️ Ritmo constante do início ao fim.");
+
+    if (teveAquecimento) {
+        estrutura.push(sortear([
+            "🟢 Mandou bem no aquecimento! Começar de leve prepara o corpo e previne lesões.",
+            "🟢 Gostei de ver a progressão no início. Seu coração agradece esse cuidado!",
+            "🟢 Bela largada! Aquecer os motores primeiro é o segredo dos treinos consistentes."
+        ]));
+    } else if (blocos.length >= 2 && primeiraVel >= velMedia) {
+        estrutura.push(sortear([
+            "⚠️ Notei que você já começou com tudo! Na próxima, tente uns minutinhos de caminhada leve antes de acelerar.",
+            "⚠️ Você tem muita energia, mas um aquecimento leve ajuda a soltar a musculatura antes do esforço."
+        ]));
+    }
+
+    if (teveDesaquecimento) {
+        estrutura.push(sortear([
+            "🔵 Terminou reduzindo o ritmo, excelente desaquecimento. Isso ajuda muito na recuperação!",
+            "🔵 Pouso suave! Baixar a frequência cardíaca aos poucos no final é perfeito."
+        ]));
+    } else if (blocos.length >= 2 && ultimaVel >= velMedia && duracaoMin > 20) {
+        estrutura.push("⚠️ Você terminou o treino voando! Tente tirar 2 minutinhos no final só para caminhar e acalmar a respiração.");
+    }
+
+    if (maiorVel > velMedia * 1.3) {
+        estrutura.push(sortear([
+            "🔺 Uau, detectei uns bons picos de velocidade! Esses 'tiros' são fantásticos para queimar gordura.",
+            "🔺 Bela variação de ritmo! Acelerar e desacelerar fortalece muito o seu fôlego."
+        ]));
+    }
+
+    if (estrutura.length === 0) estrutura.push("➡️ Ritmo super constante do início ao fim. Estabilidade pura!");
 
     let observacoes = [];
-    if (idade && idade > 50 && velMedia > 8) observacoes.push("Velocidade excelente para sua idade! 👏");
-    if (idade && idade < 20 && duracaoMin > 60) observacoes.push("Jovem e resistente! Cuidado com overtraining.");
+    if (idade && idade > 50 && velMedia > 8) observacoes.push("👏 Que vitalidade! Essa velocidade é excelente para a sua faixa etária.");
     if (imc && imc >= 30) {
-        observacoes.push("🔸 Sobrepeso/Obesidade: priorize inclinação e caminhada para proteger articulações.");
-        if (incMedia < 3) observacoes.push("Aumente a inclinação para queimar mais com menos impacto.");
+        observacoes.push(sortear([
+            "🔸 Pela sua composição atual, a inclinação pode ser uma grande aliada para aumentar o gasto calórico com menor impacto nas articulações.",
+            "🔸 Dica de ouro: aposte na inclinação! Você queima muitas calorias e ainda protege as articulações."
+        ]));
     } else if (imc && imc >= 25) {
-        observacoes.push("Leve sobrepeso: incluir treinos intervalados pode acelerar resultados.");
+        observacoes.push("💡 Incluir treinos intervalados pode acelerar seus resultados. Seu esforço já está no caminho certo!");
     }
-    if (peso > 90 && incMedia > 3) observacoes.push("Ótimo trabalho com inclinação! Protege as articulações.");
-    if (genero === "mulher" && velMedia > 7) observacoes.push("Velocidade feminina de elite! 🚀");
-    if (velMedia < 5) observacoes.push("Velocidade média baixa. Aumente 0.5 km/h por semana.");
-    if (duracaoMin < 15 && treino.pontos < 10) observacoes.push("Treino curto. Mire em 20-30 min.");
-    if (!blocos.some(b => Number(b.inc) >= 4)) observacoes.push("Pouca inclinação. Adicione subidas!");
-    if (observacoes.length === 0) observacoes.push("Parâmetros muito equilibrados! 👏");
+    if (peso > 90 && incMedia > 3) observacoes.push("🏔️ Ótimo trabalho encarando essa inclinação. Isso fortalece as pernas e poupa os joelhos!");
+    if (genero === "mulher" && velMedia > 7) observacoes.push("🚀 Velocidade de elite! Você está voando baixo hoje.");
+    if (velMedia < 5) observacoes.push("🌱 Cada passo conta! Quando sentir confiança, tente aumentar 0.5 km/h em um dos blocos.");
+    if (duracaoMin < 15 && treino.pontos < 10) observacoes.push("⚡ Treino rápido e direto. Para melhorar a resistência, tente mirar em 20-30 minutos da próxima vez.");
+    if (!blocos.some(b => Number(b.inc) >= 4) && (!imc || imc < 30)) observacoes.push("🏔️ Que tal um desafio? Adicione um pouco de inclinação no próximo treino para ativar glúteos e panturrilhas.");
+    if (observacoes.length === 0) observacoes.push(sortear([
+        "💪 Seus parâmetros estão super equilibrados. Continue nesse foco!",
+        "✨ O treino de hoje foi sólido e muito bem executado."
+    ]));
 
     let agora = new Date();
     let seteDiasAtras = new Date(agora);
@@ -531,41 +589,44 @@ function gerarFeedbackInteligente(treino) {
         let velRecentes = recentes.flatMap(t => t.blocos.map(b => Number(b.vel)||0));
         let mediaVelRecente = velRecentes.reduce((a,b)=>a+b,0)/velRecentes.length;
         let distMediaRecente = recentes.reduce((s,t)=>s+(Number(t.dist)||0),0)/recentes.length;
-        let durMediaRecente = recentes.reduce((s,t)=>{
-            let sp = t.duracao.split(/[hm]+/).map(Number);
-            return s + (sp[0]||0)*60 + (sp[1]||0);
-        },0)/recentes.length;
 
-        if (velMedia > mediaVelRecente * 1.05) sugestoes.push("📈 Velocidade média acima da sua média recente! Continue acelerando.");
-        else if (velMedia < mediaVelRecente * 0.95) sugestoes.push("📉 Velocidade um pouco abaixo do seu normal. Tente voltar ao ritmo anterior.");
-        else sugestoes.push("⚖️ Velocidade estável, mantendo boa consistência.");
+        if (velMedia > mediaVelRecente * 1.05) sugestoes.push(sortear([
+            "📈 Você está voando! Sua velocidade média hoje foi maior que a dos últimos dias. A evolução é real!",
+            "🚀 Ritmo fortíssimo hoje! Você superou sua própria média recente."
+        ]));
+        else if (velMedia < mediaVelRecente * 0.95) sugestoes.push(sortear([
+            "🧘 Hoje o ritmo foi um pouco mais cadenciado, e está tudo bem! Dias de recuperação ativa são essenciais.",
+            "🔋 Recarregando as baterias? Um treino mais leve hoje prepara o corpo para um treino forte amanhã."
+        ]));
+        else sugestoes.push("⚖️ Você é um relógio! Mantendo uma consistência incrível em relação aos últimos dias.");
 
-        if (dist > distMediaRecente * 1.1) sugestoes.push("🎯 Distância maior que a média da semana, excelente evolução!");
-        if (duracaoMin > (durMediaRecente/60) * 1.1) sugestoes.push("⏳ Duração acima da média, mostrando resistência.");
+        if (dist > distMediaRecente * 1.1) sugestoes.push("🏆 Você foi mais longe hoje! Bater sua média de distância mostra que seu corpo está ganhando resistência.");
     } else {
-        sugestoes.push("📊 Treine mais alguns dias para receber análises de tendência!");
+        sugestoes.push("📊 Continue registrando! Em alguns dias, conseguirei te mostrar como sua resistência está evoluindo.");
     }
 
     let tiroVel = Math.round(velMaxPessoal * 1.1 * 10) / 10;
     if (tiroVel <= velMaxPessoal) tiroVel = Math.round((velMaxPessoal + 1) * 10) / 10;
-    if (duracaoMin > 40) sugestoes.push("Que tal 1-2 min a "+tiroVel+" km/h? (seu máximo foi "+velMaxPessoal+" km/h)");
-    else if (duracaoMin > 25 && maiorVel < velMaxPessoal) sugestoes.push("Tente um pico de "+tiroVel+" km/h por 30 segundos.");
-    if (blocos.every(b => Number(b.inc) === 0)) sugestoes.push("Alterne inclinação: 2 min de subida, 2 min no plano.");
+    if (duracaoMin > 40) sugestoes.push(`💡 Que tal 1-2 min a ${tiroVel} km/h? Seu máximo foi ${velMaxPessoal} km/h. Teste seus limites!`);
+    else if (duracaoMin > 25 && maiorVel < velMaxPessoal) sugestoes.push(`⚡ Tente um pico de ${tiroVel} km/h por 30 segundos. Você já provou que consegue!`);
+    if (blocos.every(b => Number(b.inc) === 0)) sugestoes.push("⛰️ Varie o terreno: 2 min de subida, 2 min no plano. Seu corpo vai adorar o desafio.");
 
     if (historico.length > 2) {
         let ults = historico.filter(t => t.id !== treino.id).slice(-3);
         let mp = 0;
         for (let t of ults) mp += t.pontos || 0;
         mp /= ults.length;
-        if (treino.pontos > mp * 1.2) sugestoes.push("🔥 Superou sua média! Continue assim!");
+        if (treino.pontos > mp * 1.2) sugestoes.push("🔥 Você superou sua média! Isso mostra que está evoluindo de verdade.");
     }
-    if (sugestoes.length === 0) sugestoes.push("Continue consistente! Você está evoluindo bem. 🚀");
+    if (sugestoes.length === 0) sugestoes.push("🚀 Continue consistente! Cada treino te deixa mais forte.");
 
-    return `<div class="feedback-inteligente"><span style="font-weight:700;">🧠 Análise Inteligente</span>
-    <p><span class="secao-titulo">📋 RESUMO</span>⏱️ ${dur.texto} | 📏 ${dist} km | ⚡ Média: ${velMedia.toFixed(1)} km/h | Máx: ${maiorVel} km/h | 📈 Inc: ${incMedia.toFixed(0)}%</p>
+    let titulosIntro = ["🧠 Análise do seu Personal Digital", "💡 Insights do seu Treino", "🔍 Raio-X da Sessão", "🏆 Como você se saiu"];
+
+    return `<div class="feedback-inteligente"><span style="font-weight:800; font-size:14px;">${sortear(titulosIntro)}</span>
+    <p><span class="secao-titulo">📋 RESUMO</span>⏱️ ${dur.texto} | 📏 ${dist} km | 🔥 <strong>${calorias} kcal</strong><br>⚡ Média: ${velMedia.toFixed(1)} km/h | Máx: ${maiorVel} km/h | 📈 Inc: ${incMedia.toFixed(0)}%</p>
     <p><span class="secao-titulo">🔍 ESTRUTURA</span>${estrutura.join(' ')}</p>
-    <p><span class="secao-titulo">⚠️ OBSERVAÇÕES</span>${observacoes.join(' ')}</p>
-    <p><span class="secao-titulo">📊 TENDÊNCIA</span>${sugestoes.join(' ')}</p>
+    <p><span class="secao-titulo">🎯 TOQUE HUMANO</span>${observacoes.join(' ')}</p>
+    <p><span class="secao-titulo">📊 SUA EVOLUÇÃO</span>${sugestoes.join(' ')}</p>
     </div>`;
 }
 
@@ -722,6 +783,7 @@ function salvarTreinoComFeedback() {
     let pontos = calcularPontos(treinoAtual, dist), analise = analisarTreino(pontos), nota = notaTreino(pontos);
     let h1 = document.getElementById("horaInicio").value || null;
     let h2 = document.getElementById("horaFim").value || null;
+    let calorias = calcularCalorias(treinoAtual, perfil.peso);
 
     let dataTreinoChave = dataRetroativa || chaveData(new Date());
 
@@ -735,7 +797,7 @@ function salvarTreinoComFeedback() {
     if (h1 && h2) horarioTexto = `<div class="horario-salvo">🕐 ${h1} → ${h2}</div>`;
     else if (h1) horarioTexto = `<div class="horario-salvo">🕐 Início: ${h1}</div>`;
 
-    let feedbackSalvo = gerarFeedbackInteligente({ blocos: treinoAtual, dist, pontos, id: editandoId || Date.now() });
+    let feedbackSalvo = gerarFeedbackInteligente({ blocos: treinoAtual, dist, pontos, id: editandoId || Date.now(), calorias });
 
     let treinoObj = {
         id: editandoId || Date.now(),
@@ -747,7 +809,8 @@ function salvarTreinoComFeedback() {
         nivel: analise.nivel || null,
         retroativo: !!dataRetroativa,
         duracao: dur.texto,
-        feedback: feedbackSalvo
+        feedback: feedbackSalvo,
+        calorias: calorias
     };
 
     if (editandoId) {
@@ -765,10 +828,12 @@ function salvarTreinoComFeedback() {
     atualizarIndice();
 
     let comp = obterComparacao(treinoObj);
+    let caloriasMsg = calorias > 0 ? `<div class="calorias-badge">🔥 ${calorias} kcal</div>` : '';
     let msg = `<div class="pontos-surpresa"><div class="pontos-valor">${pontos}</div><div class="pontos-label">PONTOS</div>
         <div style="font-size:18px;">${analise.emoji} ${analise.texto}</div><div>⭐ ${nota}/10</div>
         <div class="tempo-salvo">⏱️ ${dur.texto}</div>${horarioTexto}${dataRetroativa ? '<div style="color:var(--orange);">📅 Retroativo</div>' : ''}
         ${editandoId ? '<div style="color:var(--blue);">✏️ Treino atualizado</div>' : ''}
+        ${caloriasMsg}
         <div>${comp}</div>${recordeBatido ? '<div>🏆 RECORDE DO MÊS!</div>' : ''}</div>`;
     mostrarFeedbackTemporario(msg, analise.classe);
     if (recordeBatido) criarParticulas();
@@ -872,13 +937,11 @@ function renderConquistasResumidas(mes, ano) {
     let mesAtualReal = agora.getMonth();
     let anoAtualReal = agora.getFullYear();
 
-    // Se for mês atual ou futuro, mostra apenas progresso de km
     if (ano > anoAtualReal || (ano === anoAtualReal && mes >= mesAtualReal)) {
         let kmMes = getKmDoMes(mes, ano);
         return `📏 ${kmMes.toFixed(1)} km este mês`;
     }
 
-    // Meses passados: exibe conquistas desbloqueadas
     let badges = getBadges(mes, ano);
     let conquistados = badges.filter(b => b.c());
     if (conquistados.length === 0) return "Nenhuma conquista este mês";
@@ -980,9 +1043,10 @@ function abrirDiaComAnimacao(chave) {
         let horarioInfo = "";
         if (t.horaInicio && t.horaFim) horarioInfo = `<div style="font-size:11px;color:var(--text2);">🕐 ${t.horaInicio} → ${t.horaFim}</div>`;
         else if (t.horaInicio) horarioInfo = `<div style="font-size:11px;color:var(--text2);">🕐 ${t.horaInicio}</div>`;
+        let kcalInfo = t.calorias ? `<span class="calorias-badge" style="margin-left:6px;">🔥 ${t.calorias} kcal</span>` : '';
         html += `<div class="card ${t.classe} ${t.recorde ? 'record-batido' : ''}">
             <div style="display:flex;justify-content:space-between;">
-                <span>${t.emoji||''} ${t.tipo}</span><span>⭐ ${nt}/10</span></div>
+                <span>${t.emoji||''} ${t.tipo}${kcalInfo}</span><span>⭐ ${nt}/10</span></div>
             <div>📅 ${t.data} | 📏 ${t.dist} km | 🎯 ${t.pontos} pts | ⏱️ ${t.duracao||''}</div>${horarioInfo}<hr>`;
         for (let b of t.blocos) html += `🔹 Treino: ${b.vel||0} km/h | ${b.inc||0}% | ${b.tempo||'00:00'}<br>`;
         html += `<div style="text-align:right;margin-top:10px;">
@@ -1000,7 +1064,7 @@ function registrarTreinoEsquecido(chave) {
     mostrarFeedbackTemporario("📅 Preencha os dados para " + chave, "azul");
 }
 
-// ============== NAVAÇÃO ==============
+// ============== NAVEGAÇÃO ==============
 function trocarComAnimacao(pag, el) {
     ['home','cal','prog','ajustes'].forEach(p => { let div = document.getElementById(p); if (div) div.style.display = 'none'; });
     let target = document.getElementById(pag);
@@ -1089,6 +1153,7 @@ function getBadges(mes, ano) {
         }
     }
     let geralTreinos = historico.length;
+    let kcal500 = historico.some(t => t.calorias >= 500);
     return [
         { id:"t1", nome:"1º do Mês", desc:"Primeiro", icon:"🥇", c:() => treinosMes >= 1 },
         { id:"3s", nome:"3 na Semana", desc:"3 em 7 dias", icon:"🔥", c:() => {
@@ -1112,7 +1177,8 @@ function getBadges(mes, ano) {
         { id:"mit", nome:"Mítico", desc:"150+ pts", icon:"🌟", c:() => miticoMes },
         { id:"div", nome:"Divino", desc:"200+ pts", icon:"👑", c:() => divinoMes },
         { id:"g10", nome:"Maratonista", desc:"10 total", icon:"🏃", c:() => geralTreinos >= 10 },
-        { id:"gdist", nome:"10km+", desc:"Treino 10km+", icon:"📏", c:() => historico.some(t => t.dist >= 10) }
+        { id:"gdist", nome:"10km+", desc:"Treino 10km+", icon:"📏", c:() => historico.some(t => t.dist >= 10) },
+        { id:"kcal500", nome:"Queimador 500", desc:"500 kcal", icon:"🔥", c:() => kcal500 }
     ];
 }
 
@@ -1131,7 +1197,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "12.3" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.0" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1196,7 +1262,7 @@ function atualizarRanking() {
         html += `<div class="ranking-item" style="${i === 0 ? 'background:linear-gradient(135deg,#3e2723,#4e342e);border:1px solid #ffd740;' : ''}">
             <span class="ranking-medalha">${medalhas[i]}</span>
             <div style="flex:1;margin-left:10px;"><div style="font-weight:600;">${t.emoji||''} ${t.tipo}</div>
-            <div style="font-size:11px;">${t.data} | ${t.dist} km | ⏱️ ${t.duracao||''}</div></div>
+            <div style="font-size:11px;">${t.data} | ${t.dist} km | ⏱️ ${t.duracao||''}${t.calorias ? ` | 🔥 ${t.calorias} kcal` : ''}</div></div>
             <div style="text-align:right;"><span style="font-weight:800;font-size:16px;">${t.pontos}</span><br><small>⭐${t.nota||notaTreino(t.pontos)}</small></div></div>`;
     });
     div.innerHTML = html;
@@ -1265,10 +1331,10 @@ function atualizarComparacaoMes() {
 }
 
 function atualizarResumo() {
-    let tp = 0, tk = 0;
-    for (let t of historico) { tp += t.pontos || 0; tk += Number(t.dist) || 0; }
+    let tp = 0, tk = 0, tkcal = 0;
+    for (let t of historico) { tp += t.pontos || 0; tk += Number(t.dist) || 0; tkcal += (t.calorias || 0); }
     document.getElementById("totalPontos").textContent = Math.round(tp);
-    document.getElementById("totalKmResumo").textContent = tk.toFixed(1) + " km";
+    document.getElementById("totalKmResumo").innerHTML = `${tk.toFixed(1)} km${tkcal > 0 ? ` | 🔥 ${Math.round(tkcal)} kcal` : ''}`;
 }
 
 function renderAjustes() {
@@ -1303,6 +1369,7 @@ function init() {
         if (t.retroativo === undefined) t.retroativo = false;
         if (!t.duracao) t.duracao = getDuracaoTotal(t.blocos).texto;
         if (!t.feedback) t.feedback = gerarFeedbackInteligente({ blocos:t.blocos, dist:t.dist, pontos:t.pontos, id:t.id });
+        if (t.calorias === undefined && perfil.peso > 0) { t.calorias = calcularCalorias(t.blocos, perfil.peso); atualizou = true; }
     }
     if (atualizou) localStorage.setItem("historico", JSON.stringify(historico));
 

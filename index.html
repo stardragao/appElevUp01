@@ -83,7 +83,7 @@
         .mitico{background:linear-gradient(135deg,#00e5ff,#0091ea,#7c4dff)!important;background-size:200% 200%!important;animation:rainbow 3s ease infinite!important;color:white;font-weight:bold;}
         .divino{background:linear-gradient(135deg,#ffd700,#ff9100,#ff4081,#7c4dff)!important;background-size:300% 300%!important;animation:rainbow 2s ease infinite!important;color:#000;font-weight:bold;}
 
-        .bottom-nav { position:fixed;bottom:0;left:0;right:0;max-width:500px;margin:0 auto;background:rgba(18,18,18,0.95);backdrop-filter:blur(20px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 12px var(--safe-bottom, 20px) 12px;gap:6px;border-top:1px solid var(--border);z-index:100; }
+        .bottom-nav { position:fixed;bottom:0;left:0;right:0;max-width:500px;margin:0 auto;background:rgba(18,18,18,0.95);backdrop-filter:blur(20px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 12px var(--safe-bottom) 12px;gap:6px;border-top:1px solid var(--border);z-index:100; }
         .nav-btn { padding:8px 2px;text-align:center;border-radius:40px;font-size:18px;cursor:pointer;transition:0.3s;background:transparent;border:none;color:var(--text2);display:flex;flex-direction:column;align-items:center;gap:2px; }
         .nav-btn span { font-size:9px;font-weight:600; }
         .active-nav { background:var(--green)!important;color:#000!important; }
@@ -273,8 +273,10 @@ function hojeChave() { return chaveData(new Date()); }
 
 function atualizarIndice() {
     indiceDia = {};
+    if (!Array.isArray(historico)) historico = [];
     for (let t of historico) {
         let chave = t.data;
+        if (!chave) continue;
         if (!indiceDia[chave]) indiceDia[chave] = [];
         indiceDia[chave].push(t);
     }
@@ -332,9 +334,10 @@ function getEmojiAvatar() {
 
 function atualizarPerfilUI() {
     let nome = perfil.nome || "Atleta";
-    document.getElementById("saudacaoNome").innerHTML = 'Olá, <strong>'+nome+'</strong>';
-    let elCal = document.getElementById("saudacaoNomeCal");
-    if (elCal) elCal.innerHTML = 'Olá, <strong>'+nome+'</strong>';
+    let elNome = document.getElementById("saudacaoNome");
+    if (elNome) elNome.innerHTML = 'Olá, <strong>'+nome+'</strong>';
+    let elCalNome = document.getElementById("saudacaoNomeCal");
+    if (elCalNome) elCalNome.innerHTML = 'Olá, <strong>'+nome+'</strong>';
     document.querySelectorAll(".avatar-small").forEach(av => {
         av.style.background = getCorAvatar();
         av.textContent = getEmojiAvatar();
@@ -663,36 +666,49 @@ function criarParticulas() {
 function setDataRetroativa(d) {
     dataRetroativa = d;
     editandoId = null;
-    document.getElementById("modoEdicaoInfo").style.display = "none";
+    let modoEdicao = document.getElementById("modoEdicaoInfo");
+    if (modoEdicao) modoEdicao.style.display = "none";
     let info = document.getElementById("dataRetroativaInfo");
-    document.getElementById("dataRetroativaTexto").textContent = d;
-    info.style.display = 'block';
+    if (info) {
+        document.getElementById("dataRetroativaTexto").textContent = d;
+        info.style.display = 'block';
+    }
     let btn = document.querySelector('.btn-primary');
-    btn.textContent = '📅 Salvar (Retroativo)';
-    btn.style.background = 'linear-gradient(135deg,#ff9100,#ff6d00)';
-    btn.style.color = 'white';
+    if (btn) {
+        btn.textContent = '📅 Salvar (Retroativo)';
+        btn.style.background = 'linear-gradient(135deg,#ff9100,#ff6d00)';
+        btn.style.color = 'white';
+    }
 }
 
 function limparDataRetroativa() {
     dataRetroativa = null;
     editandoId = null;
-    document.getElementById("dataRetroativaInfo").style.display = 'none';
-    document.getElementById("modoEdicaoInfo").style.display = 'none';
+    let info = document.getElementById("dataRetroativaInfo");
+    if (info) info.style.display = 'none';
+    let modoEdicao = document.getElementById("modoEdicaoInfo");
+    if (modoEdicao) modoEdicao.style.display = 'none';
     let btn = document.querySelector('.btn-primary');
-    btn.textContent = '✅ Salvar Treino';
-    btn.style.background = 'linear-gradient(135deg,#00e676 0%,#00c853 100%)';
-    btn.style.color = '#000';
+    if (btn) {
+        btn.textContent = '✅ Salvar Treino';
+        btn.style.background = 'linear-gradient(135deg,#00e676 0%,#00c853 100%)';
+        btn.style.color = '#000';
+    }
 }
 
 function entrarModoEdicao(treino) {
     editandoId = treino.id;
     dataRetroativa = null;
-    document.getElementById("dataRetroativaInfo").style.display = 'none';
-    document.getElementById("modoEdicaoInfo").style.display = 'block';
+    let info = document.getElementById("dataRetroativaInfo");
+    if (info) info.style.display = 'none';
+    let modoEdicao = document.getElementById("modoEdicaoInfo");
+    if (modoEdicao) modoEdicao.style.display = 'block';
     let btn = document.querySelector('.btn-primary');
-    btn.textContent = '✏️ Atualizar Treino';
-    btn.style.background = 'linear-gradient(135deg,#448aff,#0059c1)';
-    btn.style.color = '#fff';
+    if (btn) {
+        btn.textContent = '✏️ Atualizar Treino';
+        btn.style.background = 'linear-gradient(135deg,#448aff,#0059c1)';
+        btn.style.color = '#fff';
+    }
     treinoAtual = JSON.parse(JSON.stringify(treino.blocos));
     document.getElementById("distanciaManual").value = treino.dist || '';
     if (treino.horaInicio) document.getElementById("horaInicio").value = treino.horaInicio;
@@ -713,13 +729,17 @@ function toggleHorario() {
 }
 
 function atualizarTempoTotal() {
+    let display = document.getElementById("tempoTotalDisplay");
+    if (!display) return;
     let dur = getDuracaoTotal(treinoAtual);
-    document.getElementById("tempoTotalDisplay").innerHTML = "⏱️ " + dur.texto;
+    display.innerHTML = "⏱️ " + dur.texto;
 }
 
 function atualizarContadorTreinos() {
+    let el = document.getElementById("contadorTreinos");
+    if (!el) return;
     let q = treinoAtual.length;
-    document.getElementById("contadorTreinos").innerText = q + " treino" + (q !== 1 ? 's' : '');
+    el.innerText = q + " treino" + (q !== 1 ? 's' : '');
 }
 
 function novoTreinoComAnimacao() {
@@ -730,6 +750,8 @@ function novoTreinoComAnimacao() {
 }
 
 function renderBlocos() {
+    let container = document.getElementById("blocos");
+    if (!container) return;
     let html = `<div class="row" style="margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">
         <div class="label">VEL (km/h)</div><div class="label">INC (%)</div><div class="label">DURAÇÃO</div><div></div></div>`;
     for (let i = 0; i < treinoAtual.length; i++) {
@@ -740,7 +762,7 @@ function renderBlocos() {
             <input class="time-input" value="${t.tempo}" inputmode="numeric" pattern="[0-9]*" onfocus="this.select()" oninput="mascaraTempo(this,${i})" onblur="formatarTempo(this,${i})">
             <button class="btn-icon" onclick="removerTreino(${i})">✕</button></div>`;
     }
-    document.getElementById("blocos").innerHTML = html;
+    container.innerHTML = html;
     atualizarTempoTotal();
 }
 
@@ -845,8 +867,11 @@ function salvarTreinoComFeedback() {
     mostrarFeedbackTemporario(msg, analise.classe);
     if (recordeBatido) criarParticulas();
 
-    document.getElementById("feedbackInteligente").innerHTML = feedbackSalvo;
-    document.getElementById("feedbackInteligente").style.display = "block";
+    let feedbackDiv = document.getElementById("feedbackInteligente");
+    if (feedbackDiv) {
+        feedbackDiv.innerHTML = feedbackSalvo;
+        feedbackDiv.style.display = "block";
+    }
 
     treinoAtual = [];
     renderBlocos();
@@ -962,14 +987,18 @@ function renderConquistasResumidas(mes, ano) {
 }
 
 function renderCalendario() {
-    document.getElementById("tituloMes").innerText = new Date(anoAtual, mesAtual).toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+    let titulo = document.getElementById("tituloMes");
+    if (titulo) titulo.innerText = new Date(anoAtual, mesAtual).toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+    
     if (mostrandoMeses) {
         let nomes = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
         let html = '<div class="meses-grid">';
         for (let i = 0; i < 12; i++) html += `<div class="mes-item${i === mesAtual ? ' selecionado' : ''}" onclick="trocarMes(${i})">${nomes[i]}</div>`;
         html += '</div>';
-        document.getElementById("mesGrid").innerHTML = html;
-        document.getElementById("conquistasDoMes").innerHTML = "";
+        let grid = document.getElementById("mesGrid");
+        if (grid) grid.innerHTML = html;
+        let conq = document.getElementById("conquistasDoMes");
+        if (conq) conq.innerHTML = "";
         return;
     }
 
@@ -1006,8 +1035,10 @@ function renderCalendario() {
         htmlFinal += '<div class="cell-status"></div>';
     }
 
-    document.getElementById("mesGrid").innerHTML = htmlFinal;
-    document.getElementById("conquistasDoMes").innerHTML = renderConquistasResumidas(mesAtual, anoAtual);
+    let grid = document.getElementById("mesGrid");
+    if (grid) grid.innerHTML = htmlFinal;
+    let conq = document.getElementById("conquistasDoMes");
+    if (conq) conq.innerHTML = renderConquistasResumidas(mesAtual, anoAtual);
 }
 
 function renderSemana() {
@@ -1025,13 +1056,16 @@ function renderSemana() {
         let classe = (chave === hojeChave()) ? 'today' : '';
         html += `<div class="day ${classe}" style="${estilo}" onclick="abrirDiaComAnimacao('${chave}')">${nomes[i]}<br><span style="font-size:15px;">${data.getDate()}</span></div>`;
     }
-    document.getElementById("semanaHome").innerHTML = html;
-    document.getElementById("semanaCal").innerHTML = html;
+    let semanaHome = document.getElementById("semanaHome");
+    if (semanaHome) semanaHome.innerHTML = html;
+    let semanaCal = document.getElementById("semanaCal");
+    if (semanaCal) semanaCal.innerHTML = html;
 }
 
 function abrirDiaComAnimacao(chave) {
     let lista = indiceDia[chave] || [];
     let detalheDiv = document.getElementById("detalheDia");
+    if (!detalheDiv) return;
     let [y, m, d] = chave.split('-').map(Number);
     let dataObj = new Date(y, m-1, d);
     let hoje = new Date();
@@ -1074,7 +1108,10 @@ function registrarTreinoEsquecido(chave) {
 
 // ============== NAVEGAÇÃO ==============
 function trocarComAnimacao(pag, el) {
-    ['home','cal','prog','ajustes'].forEach(p => { let div = document.getElementById(p); if (div) div.style.display = 'none'; });
+    ['home','cal','prog','ajustes'].forEach(p => { 
+        let div = document.getElementById(p); 
+        if (div) div.style.display = 'none'; 
+    });
     let target = document.getElementById(pag);
     if (target) target.style.display = 'block';
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
@@ -1115,6 +1152,7 @@ function atualizarLembrete() {
     }
     let f = metaSemanal - c, dr = 7 - hoje.getDay();
     let card = document.getElementById("lembreteCard");
+    if (!card) return;
     if (f <= 0) {
         card.innerHTML = `🏆 Meta batida! ${c}/${metaSemanal}`;
         card.style.borderColor = "var(--yellow)";
@@ -1136,8 +1174,11 @@ function setMetaSemanal(v) {
         if (vals[i] === v) chip.classList.add("selecionado");
         else chip.classList.remove("selecionado");
     });
-    document.getElementById("metaSalvaMsg").style.display = "block";
-    setTimeout(() => { document.getElementById("metaSalvaMsg").style.display = "none"; }, 2000);
+    let msg = document.getElementById("metaSalvaMsg");
+    if (msg) {
+        msg.style.display = "block";
+        setTimeout(() => { msg.style.display = "none"; }, 2000);
+    }
     atualizarLembrete(); renderCalendario(); renderSemana();
 }
 
@@ -1205,7 +1246,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.1" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.2" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1247,21 +1288,26 @@ function atualizarProgresso() {
 }
 function atualizarEvolucao() {
     let card = document.getElementById("cardEvolucao");
-    if (historico.length < 2) { card.style.display = "none"; return; }
-    card.style.display = "block";
+    if (historico.length < 2) { if (card) card.style.display = "none"; return; }
+    if (card) card.style.display = "block";
     let ord = historico.slice().sort((a, b) => chaveData(a.data).localeCompare(chaveData(b.data)));
     let ult = ord[ord.length - 1];
     let meta = Math.round((ult.pontos * 1.1 + 5) / 2);
     if (meta <= ult.pontos) meta = Math.round(ult.pontos * 1.15);
-    document.getElementById("metaPontos").textContent = meta;
-    document.getElementById("metaBadge").textContent = "🎯 META: " + meta;
+    let metaPontos = document.getElementById("metaPontos");
+    if (metaPontos) metaPontos.textContent = meta;
+    let metaBadge = document.getElementById("metaBadge");
+    if (metaBadge) metaBadge.textContent = "🎯 META: " + meta;
     let prog = Math.min(100, Math.round((ult.pontos / meta) * 100));
-    document.getElementById("evolutionFill").style.width = prog + "%";
-    document.getElementById("evolutionText").textContent = "Faltam " + (meta - ult.pontos) + " pontos (" + prog + "%)";
+    let fill = document.getElementById("evolutionFill");
+    if (fill) fill.style.width = prog + "%";
+    let text = document.getElementById("evolutionText");
+    if (text) text.textContent = "Faltam " + (meta - ult.pontos) + " pontos (" + prog + "%)";
 }
 
 function atualizarRanking() {
     let div = document.getElementById("rankingLista");
+    if (!div) return;
     if (historico.length === 0) { div.innerHTML = "<p>Nenhum treino</p>"; return; }
     let ranking = historico.slice().sort((a, b) => b.pontos - a.pontos).slice(0, 5);
     let medalhas = ["🥇","🥈","🥉","4️⃣","5️⃣"];
@@ -1323,6 +1369,7 @@ function atualizarGraficos() {
 
 function atualizarComparacaoMes() {
     let card = document.getElementById("cardComparacaoMes");
+    if (!card) return;
     let agora = new Date();
     let em = agora.getMonth(), mp = em === 0 ? 11 : em - 1;
     let ae = agora.getFullYear(), ap = em === 0 ? ae - 1 : ae;
@@ -1345,13 +1392,15 @@ function atualizarComparacaoMes() {
 function atualizarResumo() {
     let tp = 0, tk = 0, tkcal = 0;
     for (let t of historico) { tp += t.pontos || 0; tk += Number(t.dist) || 0; tkcal += (t.calorias || 0); }
-    document.getElementById("totalPontos").textContent = Math.round(tp);
-    document.getElementById("totalKmResumo").innerHTML = `${tk.toFixed(1)} km${tkcal > 0 ? ` | 🔥 ${Math.round(tkcal)} kcal` : ''}`;
+    let totalP = document.getElementById("totalPontos");
+    if (totalP) totalP.textContent = Math.round(tp);
+    let resumo = document.getElementById("totalKmResumo");
+    if (resumo) resumo.innerHTML = `${tk.toFixed(1)} km${tkcal > 0 ? ` | 🔥 ${Math.round(tkcal)} kcal` : ''}`;
 }
 
 function renderAjustes() {
     let sel = document.getElementById("metaSemanalSelector");
-    sel.innerHTML = [2,3,4,5,6,7].map(v => `<div class="meta-chip${v === metaSemanal ? ' selecionado' : ''}" onclick="setMetaSemanal(${v})">${v}x</div>`).join('');
+    if (sel) sel.innerHTML = [2,3,4,5,6,7].map(v => `<div class="meta-chip${v === metaSemanal ? ' selecionado' : ''}" onclick="setMetaSemanal(${v})">${v}x</div>`).join('');
     renderBadges(new Date().getMonth(), new Date().getFullYear());
 }
 

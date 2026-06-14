@@ -420,15 +420,17 @@ function salvarPerfilStorage() {
     localStorage.setItem("perfil", JSON.stringify(perfil));
 }
 
-// ============== PONTUAÇÃO ==============
+// ============== PONTUAÇÃO (HH:MM) ==============
 function calcularPontos(blocos, dist) {
     let p = 0, tt = 0;
     for (let b of blocos) {
         let v = Number(b.vel) || 0, inc = Number(b.inc) || 0;
-        let sp = String(b.tempo || "00:00").split(":");
-        let m = (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
-        tt += m;
-        p += (v * 1.2 + inc * 2.0) * (m / 60);
+        let sp = String(b.tempo || '0:00').split(':');
+        let horas = Number(sp[0]) || 0;
+        let minutos = Number(sp[1]) || 0;
+        let duracaoMinutos = horas * 60 + minutos;
+        tt += duracaoMinutos;
+        p += (v * 1.2 + inc * 2.0) * (duracaoMinutos / 60);
     }
     let dk = Number(dist) || 0;
     p += dk * 8;
@@ -461,13 +463,16 @@ function notaTreino(p) {
 }
 
 function getDuracaoTotal(blocos) {
-    let t = 0;
+    let totalMinutos = 0;
     for (let b of blocos) {
-        let sp = String(b.tempo || "00:00").split(":");
-        t += (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
+        let sp = String(b.tempo || '0:00').split(':');
+        let horas = Number(sp[0]) || 0;
+        let minutos = Number(sp[1]) || 0;
+        totalMinutos += horas * 60 + minutos;
     }
-    let h = Math.floor(t / 60), m = Math.round(t % 60);
-    return { horas: h, minutos: m, texto: h > 0 ? h+"h "+m+"min" : m+"min" };
+    let h = Math.floor(totalMinutos / 60);
+    let m = totalMinutos % 60;
+    return { horas: h, minutos: m, texto: h > 0 ? h + 'h ' + m + 'min' : m + 'min' };
 }
 
 function getVelocidadeMaximaPessoal() {
@@ -481,7 +486,7 @@ function getVelocidadeMaximaPessoal() {
     return max;
 }
 
-// ============== CALORIAS (ACSM) CORRIGIDA ==============
+// ============== CALORIAS (ACSM com HH:MM) ==============
 function calcularCalorias(blocos, pesoUsuario) {
     let peso = Number(pesoUsuario);
     if (!peso || peso <= 0) return 0;
@@ -489,32 +494,22 @@ function calcularCalorias(blocos, pesoUsuario) {
     for (let b of blocos) {
         let vel = Number(b.vel) || 0;
         let inc = Number(b.inc) || 0;
-        let tempoStr = String(b.tempo || "00:00");
-        
-        // Leitura robusta do tempo (aceita "30:00" ou "30")
-        let sp = tempoStr.split(":");
-        let minutos;
-        if (sp.length >= 2) {
-            minutos = Number(sp[0]) + (Number(sp[1]) / 60);
-        } else {
-            // Se não tem dois pontos, interpreta como minutos puros
-            minutos = Number(sp[0]) || 0;
-        }
-
-        if (minutos <= 0 || vel <= 0) continue;
+        let sp = String(b.tempo || '0:00').split(':');
+        let horas = Number(sp[0]) || 0;
+        let minutos = Number(sp[1]) || 0;
+        let duracaoMinutos = horas * 60 + minutos;
+        if (duracaoMinutos <= 0 || vel <= 0) continue;
 
         let vel_m_min = vel * 16.6667;
         let inc_frac = inc / 100;
         let vo2;
-
         if (vel < 7) {
             vo2 = (0.1 * vel_m_min) + (1.8 * vel_m_min * inc_frac) + 3.5;
         } else {
             vo2 = (0.2 * vel_m_min) + (0.9 * vel_m_min * inc_frac) + 3.5;
         }
-
         let kcalMin = (vo2 * peso) / 200;
-        totalKcal += kcalMin * minutos;
+        totalKcal += kcalMin * duracaoMinutos;
     }
     return Math.round(totalKcal);
 }
@@ -523,7 +518,7 @@ function calcularCalorias(blocos, pesoUsuario) {
 function gerarFeedbackInteligente(treino) {
     let blocos = treino.blocos, dist = treino.dist, duracaoMin = 0;
     for (let b of blocos) {
-        let sp = String(b.tempo || "00:00").split(":");
+        let sp = String(b.tempo || '0:00').split(':');
         duracaoMin += (Number(sp[0]) || 0) * 60 + (Number(sp[1]) || 0);
     }
     duracaoMin /= 60;
@@ -660,6 +655,13 @@ function mostrarFeedbackTemporario(msg, cl) {
     setTimeout(() => { fb.style.display = "none"; }, 4000);
 }
 
+function ocultarFeedbacks() {
+    let fb = document.getElementById("feedback");
+    if (fb) fb.style.display = "none";
+    let fbInt = document.getElementById("feedbackInteligente");
+    if (fbInt) fbInt.style.display = "none";
+}
+
 function criarParticulas() {
     let fb = document.getElementById("feedback");
     if (!fb) return;
@@ -709,7 +711,18 @@ function limparDataRetroativa() {
     }
 }
 
+// NOVA FUNÇÃO AUXILIAR PARA EDITAR POR ID
+function editarTreinoPorId(id) {
+    let treino = historico.find(t => t.id === id);
+    if (treino) {
+        entrarModoEdicao(treino);
+    } else {
+        mostrarFeedbackTemporario("⚠️ Treino não encontrado para edição.", "vermelho");
+    }
+}
+
 function entrarModoEdicao(treino) {
+    if (!treino) { mostrarFeedbackTemporario("⚠️ Erro ao carregar treino para edição.", "vermelho"); return; }
     editandoId = treino.id;
     dataRetroativa = null;
     let info = document.getElementById("dataRetroativaInfo");
@@ -730,6 +743,17 @@ function entrarModoEdicao(treino) {
     renderBlocos();
     atualizarContadorTreinos();
     atualizarTempoTotal();
+
+    // Navega para Home SEM disparar limpeza do editandoId
+    ['home','cal','prog','ajustes'].forEach(p => { 
+        let div = document.getElementById(p); 
+        if (div) div.style.display = 'none'; 
+    });
+    let homeDiv = document.getElementById('home');
+    if (homeDiv) homeDiv.style.display = 'block';
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
+    let homeBtn = document.querySelector(".nav-btn[onclick*='home']");
+    if (homeBtn) homeBtn.classList.add("active-nav");
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -756,7 +780,7 @@ function atualizarContadorTreinos() {
 }
 
 function novoTreinoComAnimacao() {
-    treinoAtual.push({ vel: "", inc: "", tempo: "00:00" });
+    treinoAtual.push({ vel: "", inc: "", tempo: "0:00" });
     renderBlocos();
     atualizarContadorTreinos();
     atualizarTempoTotal();
@@ -786,13 +810,16 @@ function removerTreino(i) {
     atualizarTempoTotal();
 }
 
-// ============== MÁSCARA DE TEMPO CORRIGIDA ==============
+// ============== MÁSCARA DE TEMPO (HH:MM) ==============
 function mascaraTempo(el, i) {
     let v = el.value.replace(/\D/g, '');
     if (v.length > 4) v = v.slice(0, 4);
-    // Insere ":" automaticamente ao digitar o terceiro dígito (ex.: 30 -> 03:00? Melhor manter simples)
-    if (v.length > 2) {
-        el.value = v.slice(0, v.length-2) + ':' + v.slice(v.length-2);
+    if (v.length >= 3) {
+        let horas = v.slice(0, v.length - 2);
+        let minutos = v.slice(v.length - 2);
+        if (horas.length > 2) horas = horas.slice(-2);
+        if (Number(minutos) > 59) minutos = '59';
+        el.value = horas + ':' + minutos;
     } else {
         el.value = v;
     }
@@ -803,32 +830,27 @@ function mascaraTempo(el, i) {
 function formatarTempo(el, i) {
     let raw = el.value.replace(/\D/g, '');
     if (!raw) {
-        el.value = "00:00";
-        treinoAtual[i].tempo = "00:00";
+        el.value = '0:00';
+        treinoAtual[i].tempo = '0:00';
         atualizarTempoTotal();
         return;
     }
 
-    // Se não tem dois pontos, trata como minutos puros
     if (!el.value.includes(':')) {
-        let minutos = parseInt(raw, 10) || 0;
-        if (minutos > 999) minutos = 999;
-        let mm = String(minutos).padStart(2, '0');
-        el.value = mm + ":00";
+        let totalMinutos = parseInt(raw, 10) || 0;
+        let horas = Math.floor(totalMinutos / 60);
+        let minutos = totalMinutos % 60;
+        el.value = horas + ':' + String(minutos).padStart(2, '0');
         treinoAtual[i].tempo = el.value;
         atualizarTempoTotal();
         return;
     }
 
-    // Se já tem o formato MM:SS, garante padronização
-    let sp = raw.split(':') || [];
-    let mm = sp[0] || '00';
-    let ss = sp[1] || '00';
-    mm = mm.padStart(2, '0');
-    ss = ss.padStart(2, '0');
-    if (Number(ss) > 59) ss = "59";
-    if (Number(mm) > 99) mm = "99";
-    el.value = mm + ":" + ss;
+    let sp = el.value.split(':');
+    let horas = parseInt(sp[0], 10) || 0;
+    let minutos = parseInt(sp[1], 10) || 0;
+    if (minutos > 59) minutos = 59;
+    el.value = horas + ':' + String(minutos).padStart(2, '0');
     treinoAtual[i].tempo = el.value;
     atualizarTempoTotal();
 }
@@ -1009,16 +1031,18 @@ function renderConquistasResumidas(mes, ano) {
     let mesAtualReal = agora.getMonth();
     let anoAtualReal = agora.getFullYear();
 
+    let kmMes = getKmDoMes(mes, ano);
+    let textoKm = `📏 ${kmMes.toFixed(1)} km`;
+
     if (ano > anoAtualReal || (ano === anoAtualReal && mes >= mesAtualReal)) {
-        let kmMes = getKmDoMes(mes, ano);
-        return `📏 ${kmMes.toFixed(1)} km este mês`;
+        return textoKm;
     }
 
     let badges = getBadges(mes, ano);
     let conquistados = badges.filter(b => b.c());
-    if (conquistados.length === 0) return "Nenhuma conquista este mês";
+    if (conquistados.length === 0) return textoKm;
 
-    let html = '<div class="conquistas-resumidas">';
+    let html = textoKm + '<div class="conquistas-resumidas">';
     for (let b of conquistados) {
         html += `<div class="conquista-resumida"><span class="icone">${b.icon}</span><span>${b.nome}</span></div>`;
     }
@@ -1038,7 +1062,7 @@ function renderCalendario() {
         let grid = document.getElementById("mesGrid");
         if (grid) grid.innerHTML = html;
         let conq = document.getElementById("conquistasDoMes");
-        if (conq) conq.innerHTML = "";
+        if (conq) conq.innerHTML = renderConquistasResumidas(mesAtual, anoAtual);
         return;
     }
 
@@ -1130,9 +1154,9 @@ function abrirDiaComAnimacao(chave) {
             <div style="display:flex;justify-content:space-between;">
                 <span>${t.emoji||''} ${t.tipo}${kcalInfo}</span><span>⭐ ${nt}/10</span></div>
             <div>📅 ${t.data} | 📏 ${t.dist} km | 🎯 ${t.pontos} pts | ⏱️ ${t.duracao||''}</div>${horarioInfo}<hr>`;
-        for (let b of t.blocos) html += `🔹 Treino: ${b.vel||0} km/h | ${b.inc||0}% | ${b.tempo||'00:00'}<br>`;
+        for (let b of t.blocos) html += `🔹 Treino: ${b.vel||0} km/h | ${b.inc||0}% | ${b.tempo||'0:00'}<br>`;
         html += `<div style="text-align:right;margin-top:10px;">
-            <button class="btn-edit" onclick="event.stopPropagation(); entrarModoEdicao(historico.find(h=>h.id===${t.id}))">✏️ Editar</button>
+            <button class="btn-edit" onclick="event.stopPropagation(); editarTreinoPorId(${t.id})">✏️ Editar</button>
             <button class="btn-delete" onclick="event.stopPropagation(); excluirTreino(${t.id},'${t.data}')">🗑️ Excluir</button></div>`;
         if (t.feedback) html += `<div style="margin-top:10px;">${t.feedback}</div>`;
         html += '</div>';
@@ -1146,6 +1170,12 @@ function registrarTreinoEsquecido(chave) {
     mostrarFeedbackTemporario("📅 Preencha os dados para " + chave, "azul");
 }
 
+// ============== LIMPAR FEEDBACK AO NAVEGAR ==============
+function limparDetalhesCalendario() {
+    let detalhe = document.getElementById("detalheDia");
+    if (detalhe) detalhe.innerHTML = "";
+}
+
 // ============== NAVEGAÇÃO ==============
 function trocarComAnimacao(pag, el) {
     ['home','cal','prog','ajustes'].forEach(p => { 
@@ -1156,6 +1186,10 @@ function trocarComAnimacao(pag, el) {
     if (target) target.style.display = 'block';
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active-nav"));
     if (el) el.classList.add("active-nav");
+    
+    // SEMPRE ocultar feedbacks ao trocar de página
+    ocultarFeedbacks();
+    
     if (pag === "home") {
         limparDataRetroativa();
         atualizarPerfilUI();
@@ -1165,7 +1199,11 @@ function trocarComAnimacao(pag, el) {
         atualizarTempoTotal();
     }
     if (pag === "prog") setTimeout(atualizarProgresso, 150);
-    if (pag === "cal") { renderCalendario(); renderSemana(); }
+    if (pag === "cal") { 
+        limparDetalhesCalendario();
+        renderCalendario(); 
+        renderSemana(); 
+    }
     if (pag === "ajustes") renderAjustes();
 }
 
@@ -1173,10 +1211,16 @@ function mudarMes(dir) {
     mesAtual += dir;
     if (mesAtual < 0) { mesAtual = 11; anoAtual--; }
     if (mesAtual > 11) { mesAtual = 0; anoAtual++; }
+    limparDetalhesCalendario();
     renderCalendario();
 }
 function toggleMeses() { mostrandoMeses = !mostrandoMeses; renderCalendario(); }
-function trocarMes(m) { mesAtual = m; mostrandoMeses = false; renderCalendario(); }
+function trocarMes(m) { 
+    mesAtual = m; 
+    mostrandoMeses = false; 
+    limparDetalhesCalendario();
+    renderCalendario(); 
+}
 
 // ============== LEMBRETE ==============
 function atualizarLembrete() {
@@ -1286,7 +1330,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "14.0" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "15.2" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1505,6 +1549,7 @@ window.excluirTreino = excluirTreino;
 window.abrirDiaComAnimacao = abrirDiaComAnimacao;
 window.registrarTreinoEsquecido = registrarTreinoEsquecido;
 window.entrarModoEdicao = entrarModoEdicao;
+window.editarTreinoPorId = editarTreinoPorId;
 window.limparDataRetroativa = limparDataRetroativa;
 window.setDataRetroativa = setDataRetroativa;
 window.atualizarTempoTotal = atualizarTempoTotal;

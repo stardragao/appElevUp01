@@ -1016,7 +1016,8 @@ function renderCalendario() {
     for (let d = 1; d <= diasNoMes; d++) {
         let chave = `${anoAtual}-${String(mesAtual+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         let lista = indiceDia[chave] || [];
-        let treino = lista.reduce((a, b) => a.pontos > b.pontos ? a : b, null);
+        // CORREÇÃO: verificar se lista tem elementos antes do reduce
+        let treino = lista.length > 0 ? lista.reduce((a, b) => a.pontos > b.pontos ? a : b) : null;
         let classeFinal = treino ? treino.classe : "";
         let temTreino = treino ? "tem-treino" : "";
         if (treino && melhor && treino.id === melhor.id && classeFinal !== "amarelo" && classeFinal !== "lendario" && classeFinal !== "mitico" && classeFinal !== "divino") {
@@ -1051,7 +1052,8 @@ function renderSemana() {
         data.setDate(hoje.getDate() - dSemana + i);
         let chave = chaveData(data);
         let treinos = indiceDia[chave] || [];
-        let best = treinos.reduce((a, b) => a.pontos > b.pontos ? a : b, null);
+        // CORREÇÃO: verificar se treinos tem elementos antes do reduce
+        let best = treinos.length > 0 ? treinos.reduce((a, b) => a.pontos > b.pontos ? a : b) : null;
         let estilo = best ? "background:linear-gradient(135deg,#00e67620,#00c85320);border-color:#00e676;" : "";
         let classe = (chave === hojeChave()) ? 'today' : '';
         html += `<div class="day ${classe}" style="${estilo}" onclick="abrirDiaComAnimacao('${chave}')">${nomes[i]}<br><span style="font-size:15px;">${data.getDate()}</span></div>`;
@@ -1066,8 +1068,9 @@ function abrirDiaComAnimacao(chave) {
     let lista = indiceDia[chave] || [];
     let detalheDiv = document.getElementById("detalheDia");
     if (!detalheDiv) return;
-    let [y, m, d] = chave.split('-').map(Number);
-    let dataObj = new Date(y, m-1, d);
+    // CORREÇÃO: criar data de forma segura
+    let [anoStr, mesStr, diaStr] = chave.split('-');
+    let dataObj = new Date(Number(anoStr), Number(mesStr) - 1, Number(diaStr));
     let hoje = new Date();
     if (!lista.length) {
         let html = `<div class="card" style="text-align:center;"><div style="font-size:44px;">📅</div>
@@ -1246,7 +1249,7 @@ function renderBadges(mes, ano) {
 }
 
 function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.2" };
+    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "13.3" };
     let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
     let a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

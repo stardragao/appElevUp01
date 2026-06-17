@@ -1165,13 +1165,17 @@ function trocarComAnimacao(pag, el) {
     ocultarFeedbacks();
     
     if (pag === "home") {
-        limparDataRetroativa();
+        // ❌ removido: limparDataRetroativa();
         atualizarPerfilUI();
         atualizarLembrete();
         renderBlocos();
         atualizarContadorTreinos();
         atualizarTempoTotal();
+    } else {
+        // ✅ limpa a data retroativa ao sair da Home
+        limparDataRetroativa();
     }
+    
     if (pag === "prog") setTimeout(atualizarProgresso, 150);
     if (pag === "cal") { 
         limparDetalhesCalendario();

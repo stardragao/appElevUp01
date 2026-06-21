@@ -4,7 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <title>ElevUp | Eleve seu treino</title>
+    
+    <!-- Capacitor runtime (já incluso no seu projeto, garanta que o arquivo exista em www/) -->
+    <script src="./capacitor.js"></script>
+    
+    <!-- Chart.js para gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- LocalForage: banco de dados real (IndexedDB) -->
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         :root {
@@ -261,8 +270,25 @@ let graficos = {}, modalCallback = null, treinoParaExcluir = null;
 let dataRetroativa = null;
 let perfil = { nome:"", dia:"", mesNasc:"", ano:"", peso:"", altura:"", genero:"homem", avatar:"grad1" };
 let avatarSelecionado = "grad1", primeiroAcesso = false;
-
 let indiceDia = {};
+
+// ============== LOCALFORAGE (BANCO DE DADOS REAL) ==============
+// Configura o localforage (já disponível globalmente)
+localforage.config({
+    name: 'ElevUpDB',
+    storeName: 'elevup_data'
+});
+
+// Funções auxiliares assíncronas para salvar/carregar
+async function salvarHistorico() {
+    await localforage.setItem('historico', historico);
+}
+async function salvarMeta() {
+    await localforage.setItem('metaSemanal', metaSemanal);
+}
+async function salvarPerfilDB() {
+    await localforage.setItem('perfil', perfil);
+}
 
 // ============== UTILITÁRIOS ==============
 const sortear = (array) => {
@@ -382,8 +408,8 @@ function selecionarAvatar(el, tipo) {
 
 function fecharModalPerfil() { document.getElementById("modalPerfil").style.display = "none"; }
 
-function pularPerfil() {
-    if (!perfil.nome) { perfil.nome = "Atleta"; perfil.avatar = "grad1"; salvarPerfilStorage(); }
+async function pularPerfil() {
+    if (!perfil.nome) { perfil.nome = "Atleta"; perfil.avatar = "grad1"; await salvarPerfilDB(); }
     fecharModalPerfil();
     atualizarPerfilUI();
     primeiroAcesso = false;
@@ -407,7 +433,7 @@ function atualizarIMCDisplay() {
 document.getElementById("inputPeso").addEventListener('input', atualizarIMCDisplay);
 document.getElementById("inputAltura").addEventListener('input', atualizarIMCDisplay);
 
-function salvarPerfil() {
+async function salvarPerfil() {
     perfil.nome = document.getElementById("inputNome").value || "Atleta";
     perfil.dia = document.getElementById("inputDia").value || "";
     perfil.mesNasc = document.getElementById("inputMesNasc").value || "";
@@ -416,15 +442,11 @@ function salvarPerfil() {
     perfil.altura = document.getElementById("inputAltura").value || "";
     perfil.genero = document.getElementById("inputGenero").value || "homem";
     perfil.avatar = avatarSelecionado;
-    salvarPerfilStorage();
+    await salvarPerfilDB();
     atualizarPerfilUI();
     fecharModalPerfil();
     primeiroAcesso = false;
     mostrarFeedbackTemporario("✅ Perfil atualizado!", "verde");
-}
-
-function salvarPerfilStorage() {
-    localStorage.setItem("perfil", JSON.stringify(perfil));
 }
 
 // ============== PONTUAÇÃO (HH:MM) ==============
@@ -849,7 +871,7 @@ document.getElementById("modalOverlay").addEventListener("click", function(e) {
 });
 
 // ============== SALVAR ==============
-function salvarTreinoComFeedback() {
+async function salvarTreinoComFeedback() {
     if (treinoAtual.length === 0) { mostrarFeedbackTemporario("⚠️ Adicione pelo menos um treino!", "vermelho"); return; }
     let dist = Number(document.getElementById("distanciaManual").value) || 0;
     let pontos = calcularPontos(treinoAtual, dist), analise = analisarTreino(pontos), nota = notaTreino(pontos);
@@ -887,7 +909,7 @@ function salvarTreinoComFeedback() {
 
     historico.push(treinoObj);
 
-    localStorage.setItem("historico", JSON.stringify(historico));
+    await salvarHistorico();
     atualizarIndice();
 
     let comp = obterComparacao(treinoObj);
@@ -946,15 +968,15 @@ function obterComparacao(n) {
 }
 
 // ============== EXCLUIR ==============
-function excluirTreino(id, ds) {
+async function excluirTreino(id, ds) {
     fecharModal();
     treinoParaExcluir = { id, dataStr: ds };
     abrirModal(
         "🗑️ Excluir", 
         "Tem certeza que deseja excluir este treino?", 
-        function() {
+        async function() {
             historico = historico.filter(t => t.id !== treinoParaExcluir.id);
-            localStorage.setItem("historico", JSON.stringify(historico));
+            await salvarHistorico();
             atualizarIndice();
             renderCalendario();
             renderSemana();
@@ -965,9 +987,11 @@ function excluirTreino(id, ds) {
     );
 }
 
-function resetarComConfirmacao() {
-    abrirModal("⚠️ Resetar", "Apagar TODOS os dados?", function() {
-        localStorage.removeItem("historico");
+async function resetarComConfirmacao() {
+    abrirModal("⚠️ Resetar", "Apagar TODOS os dados?", async function() {
+        await localforage.removeItem("historico");
+        await localforage.removeItem("metaSemanal");
+        await localforage.removeItem("perfil");
         historico = [];
         indiceDia = {};
         treinoAtual = [];
@@ -1165,14 +1189,12 @@ function trocarComAnimacao(pag, el) {
     ocultarFeedbacks();
     
     if (pag === "home") {
-        // ❌ removido: limparDataRetroativa();
         atualizarPerfilUI();
         atualizarLembrete();
         renderBlocos();
         atualizarContadorTreinos();
         atualizarTempoTotal();
     } else {
-        // ✅ limpa a data retroativa ao sair da Home
         limparDataRetroativa();
     }
     
@@ -1228,9 +1250,9 @@ function atualizarLembrete() {
     card.style.display = "block";
 }
 
-function setMetaSemanal(v) {
+async function setMetaSemanal(v) {
     metaSemanal = v;
-    localStorage.setItem("metaSemanal", JSON.stringify(metaSemanal));
+    await salvarMeta();
     document.querySelectorAll("#metaSemanalSelector .meta-chip").forEach((chip, i) => {
         let vals = [2,3,4,5,6,7];
         if (vals[i] === v) chip.classList.add("selecionado");
@@ -1307,32 +1329,71 @@ function renderBadges(mes, ano) {
     grid.innerHTML = html;
 }
 
-function exportarDados() {
-    let dados = { historico, metaSemanal, perfil, exportadoEm: new Date().toISOString(), versao: "16.0" };
-    let blob = new Blob([JSON.stringify(dados)], { type: "application/json" });
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
-    a.click();
+// ============== EXPORTAÇÃO E IMPORTAÇÃO ==============
+async function exportarDados() {
+    let dados = {
+        historico,
+        metaSemanal,
+        perfil,
+        exportadoEm: new Date().toISOString(),
+        versao: "16.0"
+    };
+    let json = JSON.stringify(dados);
+    let nomeArquivo = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
+
+    // Tenta usar Capacitor se estiver em ambiente nativo
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        try {
+            const { Filesystem, Directory } = Capacitor.Plugins;
+            const { Share } = Capacitor.Plugins;
+
+            let result = await Filesystem.writeFile({
+                path: nomeArquivo,
+                data: json,
+                directory: Directory.Documents,
+                encoding: 'utf8'
+            });
+
+            await Share.share({
+                title: 'Backup ElevUp',
+                text: 'Aqui está seu backup do ElevUp!',
+                url: result.uri,
+                dialogTitle: 'Salvar backup'
+            });
+
+            mostrarFeedbackTemporario("✅ Backup exportado com sucesso!", "verde");
+        } catch(e) {
+            console.error(e);
+            mostrarFeedbackTemporario("❌ Erro ao exportar. Tente novamente.", "vermelho");
+        }
+    } else {
+        // Fallback para navegador
+        let blob = new Blob([json], { type: "application/json" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = nomeArquivo;
+        a.click();
+        mostrarFeedbackTemporario("✅ Backup baixado!", "verde");
+    }
 }
 
 function importarDados() { document.getElementById("importFile").click(); }
 
-function processarImportacao(event) {
+async function processarImportacao(event) {
     let file = event.target.files[0];
     if (!file) return;
     let reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             let dados = JSON.parse(e.target.result);
             if (!dados.historico || !Array.isArray(dados.historico)) throw new Error("Inválido");
-            abrirModal("Importar", dados.historico.length + " treinos. Substituir?", function() {
+            abrirModal("Importar", dados.historico.length + " treinos. Substituir?", async function() {
                 historico = dados.historico;
                 metaSemanal = dados.metaSemanal || 3;
                 if (dados.perfil) perfil = dados.perfil;
-                localStorage.setItem("historico", JSON.stringify(historico));
-                localStorage.setItem("metaSemanal", JSON.stringify(metaSemanal));
-                localStorage.setItem("perfil", JSON.stringify(perfil));
+                await salvarHistorico();
+                await salvarMeta();
+                await salvarPerfilDB();
                 atualizarIndice();
                 renderCalendario(); renderSemana(); renderAjustes();
                 atualizarLembrete(); atualizarPerfilUI();
@@ -1345,6 +1406,7 @@ function processarImportacao(event) {
     event.target.value = "";
 }
 
+// ============== ATUALIZAÇÃO DO PROGRESSO ==============
 function atualizarProgresso() {
     atualizarEvolucao(); atualizarRanking(); atualizarGraficos(); atualizarResumo(); atualizarComparacaoMes();
 }
@@ -1466,12 +1528,12 @@ function renderAjustes() {
     renderBadges(new Date().getMonth(), new Date().getFullYear());
 }
 
-// ============== INICIALIZAÇÃO ==============
-function init() {
+// ============== INICIALIZAÇÃO ASSÍNCRONA ==============
+async function init() {
     try {
-        historico = JSON.parse(localStorage.getItem("historico")) || [];
-        metaSemanal = JSON.parse(localStorage.getItem("metaSemanal")) || 3;
-        perfil = JSON.parse(localStorage.getItem("perfil")) || perfil;
+        historico = await localforage.getItem("historico") || [];
+        metaSemanal = await localforage.getItem("metaSemanal") || 3;
+        perfil = await localforage.getItem("perfil") || perfil;
         avatarSelecionado = perfil.avatar || "grad1";
         if (!perfil.nome) primeiroAcesso = true;
     } catch (e) { primeiroAcesso = true; }
@@ -1494,7 +1556,7 @@ function init() {
         if (!t.feedback) t.feedback = gerarFeedbackInteligente({ blocos:t.blocos, dist:t.dist, pontos:t.pontos, id:t.id });
         if (t.calorias === undefined && perfil.peso > 0) { t.calorias = calcularCalorias(t.blocos, perfil.peso); atualizou = true; }
     }
-    if (atualizou) localStorage.setItem("historico", JSON.stringify(historico));
+    if (atualizou) await salvarHistorico();
 
     atualizarIndice();
     renderBlocos(); atualizarContadorTreinos(); atualizarTempoTotal();

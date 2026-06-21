@@ -1305,31 +1305,48 @@ function renderBadges(mes, ano) {
     grid.innerHTML = html;
 }
 
-// ============== EXPORTAÇÃO CORRIGIDA (FUNCIONA EM TODOS OS NAVEGADORES) ==============
+// ============== EXPORTAÇÃO ULTRA CONFIÁVEL ==============
 function exportarDados() {
-    let dados = {
+    const dados = {
         historico,
         metaSemanal,
         perfil,
         exportadoEm: new Date().toISOString(),
         versao: "16.0"
     };
+    const json = JSON.stringify(dados);
+    const nomeArquivo = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
 
-    let json = JSON.stringify(dados);
-    let blob = new Blob([json], { type: "application/json" });
-    let url = URL.createObjectURL(blob);
-    let nomeArquivo = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    // Método 1: download via Blob (funciona na maioria dos navegadores)
+    try {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = nomeArquivo;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        mostrarFeedbackTemporario("✅ Backup baixado!", "verde");
+        return;
+    } catch (e) {
+        console.warn("Download automático falhou, tentando abrir como texto...");
+    }
 
-    // Cria o link, adiciona ao DOM, clica e remove
-    let a = document.createElement("a");
-    a.href = url;
-    a.download = nomeArquivo;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    mostrarFeedbackTemporario("✅ Backup baixado!", "verde");
+    // Método 2: abrir em nova aba (se o download for bloqueado)
+    try {
+        const novaAba = window.open("", "_blank");
+        novaAba.document.write("<pre>" + json + "</pre>");
+        novaAba.document.title = nomeArquivo;
+        novaAba.document.close();
+        mostrarFeedbackTemporario("📄 Backup aberto em nova aba. Salve a página como .json", "azul");
+        return;
+    } catch (e) {
+        // Último recurso: alerta com o texto
+        alert("Não foi possível exportar automaticamente. Copie manualmente:\n\n" + json);
+    }
 }
 
 function importarDados() { document.getElementById("importFile").click(); }

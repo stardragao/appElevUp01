@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <title>ElevUp | Eleve seu treino</title>
     
-    <!-- Capacitor runtime -->
-    <script src="./capacitor.js"></script>
-    
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -262,6 +259,12 @@
 (function() {
 'use strict';
 
+// ============== CONFIGURAÇÃO DO LOCALFORAGE ==============
+localforage.config({
+    name: 'ElevUpDB',
+    storeName: 'elevup_data'
+});
+
 // ============== ESTADO GLOBAL ==============
 let treinoAtual = [], historico = [], metaSemanal = 3;
 let mesAtual = new Date().getMonth(), anoAtual = new Date().getFullYear();
@@ -272,49 +275,28 @@ let perfil = { nome:"", dia:"", mesNasc:"", ano:"", peso:"", altura:"", genero:"
 let avatarSelecionado = "grad1", primeiroAcesso = false;
 let indiceDia = {};
 
-// ============== LOCALFORAGE (BANCO DE DADOS REAL) ==============
-localforage.config({
-    name: 'ElevUpDB',
-    storeName: 'elevup_data'
-});
+// ============== FUNÇÕES ASSÍNCRONAS DO BANCO ==============
+async function salvarHistorico() { await localforage.setItem('historico', historico); }
+async function salvarMeta() { await localforage.setItem('metaSemanal', metaSemanal); }
+async function salvarPerfilDB() { await localforage.setItem('perfil', perfil); }
 
-async function salvarHistorico() {
-    await localforage.setItem('historico', historico);
-}
-async function salvarMeta() {
-    await localforage.setItem('metaSemanal', metaSemanal);
-}
-async function salvarPerfilDB() {
-    await localforage.setItem('perfil', perfil);
-}
-
-// ============== MIGRAÇÃO DO localStorage PARA O LOCALFORAGE ==============
+// ============== MIGRAÇÃO localStorage -> LocalForage ==============
 async function migrarLocalStorageParaLocalForage() {
     try {
         const jaMigrou = await localforage.getItem('_migrado');
-        if (jaMigrou) return; // já fez a migração antes
+        if (jaMigrou) return;
 
         const histStr = localStorage.getItem('historico');
         const metaStr = localStorage.getItem('metaSemanal');
         const perfilStr = localStorage.getItem('perfil');
 
-        if (histStr) {
-            const hist = JSON.parse(histStr);
-            await localforage.setItem('historico', hist);
-            console.log('✅ Histórico migrado:', hist.length, 'treinos');
-        }
-        if (metaStr) {
-            await localforage.setItem('metaSemanal', JSON.parse(metaStr));
-        }
-        if (perfilStr) {
-            await localforage.setItem('perfil', JSON.parse(perfilStr));
-        }
+        if (histStr) await localforage.setItem('historico', JSON.parse(histStr));
+        if (metaStr) await localforage.setItem('metaSemanal', JSON.parse(metaStr));
+        if (perfilStr) await localforage.setItem('perfil', JSON.parse(perfilStr));
 
         await localforage.setItem('_migrado', true);
-        console.log('🚀 Migração concluída!');
-    } catch (e) {
-        console.error('Erro na migração:', e);
-    }
+        console.log('Migração concluída!');
+    } catch(e) { console.error('Erro na migração:', e); }
 }
 
 // ============== UTILITÁRIOS ==============
@@ -542,7 +524,7 @@ function getVelocidadeMaximaPessoal() {
     return max;
 }
 
-// ============== CALORIAS (ACSM com HH:MM) ==============
+// ============== CALORIAS (ACSM) ==============
 function calcularCalorias(blocos, pesoUsuario) {
     let peso = Number(pesoUsuario);
     if (!peso || peso <= 0) return 0;
@@ -570,7 +552,7 @@ function calcularCalorias(blocos, pesoUsuario) {
     return Math.round(totalKcal);
 }
 
-// ============== FEEDBACK INTELIGENTE (HUMANIZADO) ==============
+// ============== FEEDBACK INTELIGENTE ==============
 function gerarFeedbackInteligente(treino) {
     let blocos = treino.blocos, dist = treino.dist, duracaoMin = 0;
     for (let b of blocos) {
@@ -814,7 +796,7 @@ function removerTreino(i) {
     atualizarTempoTotal();
 }
 
-// ============== MÁSCARA DE TEMPO (HH:MM) ==============
+// ============== MÁSCARA DE TEMPO ==============
 function mascaraTempo(el, i) {
     let v = el.value.replace(/\D/g, '');
     if (v.length > 4) v = v.slice(0, 4);
@@ -859,7 +841,7 @@ function formatarTempo(el, i) {
     atualizarTempoTotal();
 }
 
-// ============== MODAL GENÉRICO (CORRIGIDO) ==============
+// ============== MODAL GENÉRICO ==============
 function abrirModal(t, m, c, ct) {
     document.getElementById("modalTitle").textContent = t;
     document.getElementById("modalMessage").textContent = m;
@@ -935,7 +917,6 @@ async function salvarTreinoComFeedback() {
     };
 
     historico.push(treinoObj);
-
     await salvarHistorico();
     atualizarIndice();
 
@@ -1016,7 +997,7 @@ async function excluirTreino(id, ds) {
 
 async function resetarComConfirmacao() {
     abrirModal("⚠️ Resetar", "Apagar TODOS os dados?", async function() {
-        await localforage.clear(); // limpa tudo
+        await localforage.clear();
         historico = [];
         indiceDia = {};
         treinoAtual = [];
@@ -1055,13 +1036,9 @@ function renderConquistasResumidas(mes, ano) {
     let agora = new Date();
     let mesAtualReal = agora.getMonth();
     let anoAtualReal = agora.getFullYear();
-
     let kmMes = getKmDoMes(mes, ano);
     let textoKm = `📏 ${kmMes.toFixed(1)} km`;
-
-    if (ano > anoAtualReal || (ano === anoAtualReal && mes >= mesAtualReal)) {
-        return textoKm;
-    }
+    if (ano > anoAtualReal || (ano === anoAtualReal && mes >= mesAtualReal)) return textoKm;
 
     let badges = getBadges(mes, ano);
     let conquistados = badges.filter(b => b.c());
@@ -1354,49 +1331,58 @@ function renderBadges(mes, ano) {
     grid.innerHTML = html;
 }
 
-// ============== EXPORTAÇÃO E IMPORTAÇÃO ==============
+// ============== EXPORTAÇÃO/IMPORTAÇÃO ==============
 async function exportarDados() {
-    let dados = {
+    const dados = {
         historico,
         metaSemanal,
         perfil,
         exportadoEm: new Date().toISOString(),
         versao: "16.0"
     };
-    let json = JSON.stringify(dados);
-    let nomeArquivo = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    const json = JSON.stringify(dados);
+    const nomeArquivo = "elevup-backup-" + new Date().toISOString().slice(0,10) + ".json";
 
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+    // 1) Tentativa: Capacitor Filesystem + Share (nativo)
+    if (window.Capacitor?.Plugins?.Filesystem && window.Capacitor?.Plugins?.Share) {
         try {
-            const { Filesystem, Directory } = Capacitor.Plugins;
-            const { Share } = Capacitor.Plugins;
-
-            let result = await Filesystem.writeFile({
+            const { Filesystem, Directory } = window.Capacitor.Plugins;
+            const { Share } = window.Capacitor.Plugins;
+            const result = await Filesystem.writeFile({
                 path: nomeArquivo,
                 data: json,
                 directory: Directory.Documents,
                 encoding: 'utf8'
             });
-
             await Share.share({
                 title: 'Backup ElevUp',
-                text: 'Aqui está seu backup do ElevUp!',
+                text: 'Arquivo de backup do ElevUp',
                 url: result.uri,
                 dialogTitle: 'Salvar backup'
             });
+            mostrarFeedbackTemporario("✅ Backup compartilhado!", "verde");
+            return;
+        } catch(e) { console.warn("Fallback Capacitor:", e); }
+    }
 
-            mostrarFeedbackTemporario("✅ Backup exportado com sucesso!", "verde");
-        } catch(e) {
-            console.error(e);
-            mostrarFeedbackTemporario("❌ Erro ao exportar. Tente novamente.", "vermelho");
-        }
-    } else {
-        let blob = new Blob([json], { type: "application/json" });
-        let a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = nomeArquivo;
-        a.click();
-        mostrarFeedbackTemporario("✅ Backup baixado!", "verde");
+    // 2) Tentativa: Web Share API (compartilhar texto)
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Backup ElevUp',
+                text: json,
+            });
+            mostrarFeedbackTemporario("✅ Backup compartilhado! Cole em um app de notas.", "verde");
+            return;
+        } catch(e) { console.warn("Fallback Web Share:", e); }
+    }
+
+    // 3) Área de transferência
+    try {
+        await navigator.clipboard.writeText(json);
+        mostrarFeedbackTemporario("📋 Backup copiado para a área de transferência!", "azul");
+    } catch(e) {
+        alert("Não foi possível exportar. Copie manualmente:\n\n" + json);
     }
 }
 
@@ -1429,7 +1415,7 @@ async function processarImportacao(event) {
     event.target.value = "";
 }
 
-// ============== ATUALIZAÇÃO DO PROGRESSO ==============
+// ============== PROGRESSO ==============
 function atualizarProgresso() {
     atualizarEvolucao(); atualizarRanking(); atualizarGraficos(); atualizarResumo(); atualizarComparacaoMes();
 }
@@ -1551,11 +1537,12 @@ function renderAjustes() {
     renderBadges(new Date().getMonth(), new Date().getFullYear());
 }
 
-// ============== INICIALIZAÇÃO ASSÍNCRONA ==============
+// ============== INICIALIZAÇÃO ==============
 async function init() {
-    // 🔁 Migra os dados antigos do localStorage para o LocalForage (apenas 1 vez)
+    // Migração do localStorage antigo (roda só uma vez)
     await migrarLocalStorageParaLocalForage();
 
+    // Carregar dados do LocalForage
     try {
         historico = await localforage.getItem("historico") || [];
         metaSemanal = await localforage.getItem("metaSemanal") || 3;
@@ -1592,6 +1579,7 @@ async function init() {
     if (primeiroAcesso || !perfil.nome) setTimeout(() => abrirModalPerfil(), 500);
 }
 
+// Expor funções globalmente
 window.novoTreinoComAnimacao = novoTreinoComAnimacao;
 window.removerTreino = removerTreino;
 window.mascaraTempo = mascaraTempo;

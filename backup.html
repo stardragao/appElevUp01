@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup ElevUp</title>
+    <style>
+        body { background:#0a0a0a; color:#fff; font-family:monospace; padding:20px; }
+        pre { background:#1e1e1e; padding:15px; border-radius:10px; overflow-x:auto; white-space:pre-wrap; word-wrap:break-word; }
+    </style>
+</head>
+<body>
+    <h2>🔐 Backup dos seus dados do ElevUp</h2>
+    <p>Copie todo o texto abaixo e salve como <strong>backup.json</strong>.</p>
+    <pre id="dados">Carregando...</pre>
+    <script>
+        const dados = {
+            historico: JSON.parse(localStorage.getItem('historico') || '[]'),
+            metaSemanal: JSON.parse(localStorage.getItem('metaSemanal') || '3'),
+            perfil: JSON.parse(localStorage.getItem('perfil') || '{}')
+        };
+        document.getElementById('dados').textContent = JSON.stringify(dados, null, 2);
+    </script>
+</body>
+</html>
